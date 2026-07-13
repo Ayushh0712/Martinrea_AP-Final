@@ -400,6 +400,7 @@ export default function OcrValidationPage() {
                     extractionId={active.id}
                     directUrl={active.viewUrl}
                     filename={active.originalFilename}
+                    mimeType={active.mimeType}
                   />
                 </div>
               </CardContent>

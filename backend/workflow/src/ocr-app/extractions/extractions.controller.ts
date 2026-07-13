@@ -6,6 +6,8 @@ import {
   Header,
   HttpCode,
   HttpStatus,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -36,6 +38,8 @@ import { ExtractionStoreService } from './extraction-store.service';
 @UseGuards(JwtAuthGuard)
 @Controller('ocr/extractions')
 export class ExtractionsController {
+  private readonly logger = new Logger(ExtractionsController.name);
+
   constructor(
     private readonly store: ExtractionStoreService,
     private readonly autoIngest: OciAutoIngestService,
@@ -156,31 +160,50 @@ export class ExtractionsController {
   }
 
   /**
-   * Server-rendered PNG page fallback for TIFFs the browser can't decode.
-   * The stored original TIFF is untouched — sharp reads it once and returns
-   * a lossless PNG for display only. X-Page-Count enables multi-page nav.
+   * Server-rendered PNG page for browser review of TIFFs (the primary display
+   * path — browsers can't render TIFF in an <img>). The stored original TIFF
+   * is untouched: sharp reads it once and returns a lossless PNG for display
+   * only. X-Page-Count enables multi-page nav.
    */
   @Get(':id/preview')
   @Header('Cache-Control', 'no-store')
-  @ApiOperation({ summary: 'Server-rendered PNG page for extraction TIFF fallback' })
+  @ApiOperation({ summary: 'Server-rendered PNG page for extraction TIFF preview' })
   async preview(
     @Param('id') id: string,
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 0,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<Buffer> {
+    // Non-passthrough @Res(): we write the raw PNG bytes to the socket
+    // ourselves. With passthrough:true Nest re-serialises whatever we return,
+    // which JSON-encodes the Buffer as `{"type":"Buffer","data":[...]}` even
+    // when Content-Type is set to image/png.
+    @Res() res: Response,
+  ): Promise<void> {
     const extraction = this.store.get(id);
     if (!extraction) {
       throw new NotFoundException(`Extraction ${id} not found`);
     }
-    const buffer = await this.oci.downloadBuffer(extraction.sourceObjectName);
-    const total = await this.tiff.pageCount(buffer);
-    const safePage = Math.min(Math.max(page, 0), Math.max(total - 1, 0));
-    const png = await this.tiff.renderPng(buffer, safePage);
-    res.set({
-      'Content-Type': 'image/png',
-      'Content-Length': String(png.length),
-      'X-Page-Count': String(total),
-    });
-    return png;
+    this.logger.log(
+      `preview extraction=${id} object=${extraction.sourceObjectName} page=${page}`,
+    );
+    try {
+      const buffer = await this.oci.downloadBuffer(extraction.sourceObjectName);
+      const total = await this.tiff.pageCount(buffer);
+      const safePage = Math.min(Math.max(page, 0), Math.max(total - 1, 0));
+      const png = await this.tiff.renderPng(buffer, safePage);
+      res.set({
+        'Content-Type': 'image/png',
+        'Content-Length': String(png.length),
+        'X-Page-Count': String(total),
+      });
+      this.logger.log(
+        `preview ok extraction=${id} page=${safePage}/${total} bytes=${png.length}`,
+      );
+      res.end(png);
+    } catch (err) {
+      const msg = (err as Error).message;
+      this.logger.error(
+        `preview failed extraction=${id} object=${extraction.sourceObjectName} page=${page}: ${msg}`,
+      );
+      throw new InternalServerErrorException(`TIFF preview failed: ${msg}`);
+    }
   }
 }

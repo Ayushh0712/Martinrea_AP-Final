@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Header,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -37,6 +39,8 @@ import { TiffPreviewService } from './tiff-preview.service';
 @UseGuards(JwtAuthGuard)
 @Controller('documents')
 export class DocumentsController {
+  private readonly logger = new Logger(DocumentsController.name);
+
   constructor(
     @InjectModel(Invoice) private readonly invoiceModel: typeof Invoice,
     private readonly oci: OciService,
@@ -111,28 +115,45 @@ export class DocumentsController {
   }
 
   /**
-   * Server-rendered PNG fallback for TIFFs the browser can't decode client-
-   * side. `page` is 0-indexed; the response includes X-Page-Count so the
-   * viewer can build multi-page nav. The stored TIFF is never modified.
+   * Server-rendered PNG page for browser review of TIFFs (browsers can't
+   * render TIFF in an <img>). `page` is 0-indexed; the response includes
+   * X-Page-Count so the viewer can build multi-page nav. The stored TIFF
+   * is never modified.
    */
   @Get(':id/preview')
   @Header('Cache-Control', 'no-store')
-  @ApiOperation({ summary: 'Server-rendered PNG page for TIFF preview fallback' })
+  @ApiOperation({ summary: 'Server-rendered PNG page for TIFF preview' })
   async preview(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 0,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<Buffer> {
-    const { buffer } = await this.resolveBytes(id);
-    const total = await this.tiff.pageCount(buffer);
-    const safePage = Math.min(Math.max(page, 0), Math.max(total - 1, 0));
-    const png = await this.tiff.renderPng(buffer, safePage);
-    res.set({
-      'Content-Type': 'image/png',
-      'Content-Length': String(png.length),
-      'X-Page-Count': String(total),
-    });
-    return png;
+    // Non-passthrough @Res(): write the raw PNG bytes to the socket ourselves.
+    // With passthrough:true Nest JSON-encodes the returned Buffer even when
+    // Content-Type is image/png (yields `{"type":"Buffer","data":[...]}`).
+    @Res() res: Response,
+  ): Promise<void> {
+    this.logger.log(`preview invoice=${id} page=${page}`);
+    try {
+      const { buffer, filename } = await this.resolveBytes(id);
+      const total = await this.tiff.pageCount(buffer);
+      const safePage = Math.min(Math.max(page, 0), Math.max(total - 1, 0));
+      const png = await this.tiff.renderPng(buffer, safePage);
+      res.set({
+        'Content-Type': 'image/png',
+        'Content-Length': String(png.length),
+        'X-Page-Count': String(total),
+      });
+      this.logger.log(
+        `preview ok invoice=${id} file=${filename} page=${safePage}/${total} bytes=${png.length}`,
+      );
+      res.end(png);
+    } catch (err) {
+      // NotFoundException from resolveBytes should propagate as-is; sharp/OCI
+      // errors bubble up as a 500 with the message surfaced in the log.
+      if (err instanceof NotFoundException) throw err;
+      const msg = (err as Error).message;
+      this.logger.error(`preview failed invoice=${id} page=${page}: ${msg}`);
+      throw new InternalServerErrorException(`TIFF preview failed: ${msg}`);
+    }
   }
 
   /**

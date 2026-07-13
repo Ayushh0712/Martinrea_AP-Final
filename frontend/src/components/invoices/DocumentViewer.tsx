@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
@@ -11,45 +11,50 @@ import {
   Plus,
   RotateCw,
 } from 'lucide-react';
-import UTIF, { type IFD as UtifIFD } from 'utif';
 import { api, documentsApi } from '@/lib/api';
 import { queryKeys } from '@/lib/query-client';
 import { Button } from '@/components/ui/button';
 
 /**
- * Renders the original invoice document (PRD UI-A-03 / DAT-02). Fetches a
- * short-lived view URL from GET /api/documents/:id/view and shows it inline.
+ * Renders the original invoice document (PRD UI-A-03 / DAT-02).
  *
  * - PDFs render in an iframe (browser's built-in viewer).
  * - PNG/JPG render in an <img> with CSS-zoom.
- * - TIFF is decoded client-side into a <canvas> via UTIF (true pixels, no
- *   server re-encode). If UTIF can't decode a specific TIFF variant, the
- *   viewer falls back to a lossless server-rendered PNG page.
+ * - TIFF is converted to PNG server-side (sharp/libvips) *for display only* —
+ *   the stored original TIFF and the OCR pipeline are untouched. Browsers
+ *   can't render TIFF in an <img>, so the server does the conversion and the
+ *   viewer just shows the returned PNG. Multi-page TIFFs use X-Page-Count for
+ *   prev/next nav.
  *
- * `invoiceId` is used for persisted invoices; `extractionId` for in-memory OCR
- * extractions (OcrValidationPage). Exactly one identifier is expected, or a
- * `directUrl` for non-TIFF documents whose bytes live off-origin.
+ * Use `invoiceId` for persisted invoices, or `extractionId` for in-memory OCR
+ * extractions (OcrValidationPage). `directUrl` is used for non-TIFF documents
+ * whose bytes live off-origin (e.g. the OCI PAR view URL for a PDF).
  */
 export function DocumentViewer({
   invoiceId,
   extractionId,
   filename,
+  mimeType,
   directUrl,
 }: {
   invoiceId?: string | null;
   extractionId?: string | null;
   filename?: string | null;
   /**
+   * Server-reported MIME type. Used as the primary TIFF detector so an
+   * off-origin OCI URL with query params can't slip past the extension check.
+   */
+  mimeType?: string | null;
+  /**
    * Render this URL directly (e.g. an OCI pre-authenticated view URL). Used
-   * by callers that already have a browser-openable URL and no id (e.g. the
-   * side-by-side PO document panel). Not used for TIFF fetches — TIFFs need
-   * same-origin bytes to satisfy CORS + UTIF.
+   * by callers that already have a browser-openable URL and no id. NOT used
+   * for TIFFs — those always go through the server PNG endpoint.
    */
   directUrl?: string | null;
 }) {
   const [zoom, setZoom] = useState(1);
 
-  // Resolve the /view URL only for persisted invoices; extraction and direct
+  // Fetch the /view URL only for persisted invoices; extraction and direct
   // modes skip this call entirely.
   const q = useQuery({
     queryKey: invoiceId ? queryKeys.documentView(invoiceId) : ['documents', 'noop'],
@@ -57,14 +62,15 @@ export function DocumentViewer({
     enabled: !!invoiceId && !directUrl && !extractionId,
   });
 
-  // Filename first, then fall back to view URL for extension sniffing.
   const nameForType =
     filename ?? q.data?.originalFilename ?? directUrl ?? q.data?.url ?? '';
-  const looksTiff = /\.tiff?(?:$|[?#])/i.test(nameForType);
+  const looksTiff =
+    (mimeType ?? '').toLowerCase() === 'image/tiff' ||
+    /\.tiff?(?:$|[?#])/i.test(nameForType);
   const looksPdf = nameForType.toLowerCase().includes('.pdf');
 
-  // TIFF path: identical for invoice / extraction / direct — always fetches
-  // authed bytes from a same-origin backend endpoint.
+  // TIFF path: identical for invoice / extraction — always fetches a
+  // same-origin PNG rendered by sharp on the backend.
   if (looksTiff) {
     const base = extractionId
       ? `/ocr/extractions/${extractionId}`
@@ -200,7 +206,7 @@ function NonTiffViewer({
   );
 }
 
-// ─── TIFF renderer (client canvas + server PNG fallback) ────────────────────
+// ─── TIFF renderer (server-side PNG via sharp) ──────────────────────────────
 
 function TiffViewer({
   base,
@@ -213,103 +219,65 @@ function TiffViewer({
 }) {
   const [pageCount, setPageCount] = useState(1);
   const [page, setPage] = useState(0);
-  const [status, setStatus] = useState<'loading' | 'canvas' | 'fallback' | 'error'>('loading');
-  const [canvasImg, setCanvasImg] = useState<{ url: string; width: number; height: number } | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading');
   const [pngUrl, setPngUrl] = useState<string | null>(null);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
 
-  const revokeAll = useCallback(() => {
-    if (canvasImg?.url) URL.revokeObjectURL(canvasImg.url);
-    if (pngUrl) URL.revokeObjectURL(pngUrl);
-  }, [canvasImg, pngUrl]);
-
-  // Reset when the target changes.
+  // Reset when the target changes (e.g. selecting a different extraction).
   useEffect(() => {
     setPage(0);
     setPageCount(1);
     setStatus('loading');
+    setErrMsg(null);
   }, [base]);
 
-  // Client-side render (tries UTIF; on failure falls back to server PNG).
   useEffect(() => {
     let active = true;
+    let createdUrl: string | null = null;
     setStatus('loading');
 
-    const renderFallback = async () => {
-      try {
-        const res = await api.get(`${base}/preview`, {
-          params: { page },
-          responseType: 'blob',
-        });
+    api
+      .get(`${base}/preview`, {
+        params: { page },
+        responseType: 'blob',
+      })
+      .then((res) => {
         if (!active) return;
-        const url = URL.createObjectURL(res.data);
+        createdUrl = URL.createObjectURL(res.data);
         setPngUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);
-          return url;
+          return createdUrl;
         });
         const total = Number(res.headers['x-page-count'] ?? '1');
         if (Number.isFinite(total) && total > 0) setPageCount(total);
-        setStatus('fallback');
-      } catch {
-        if (active) setStatus('error');
-      }
-    };
-
-    const run = async () => {
-      try {
-        const res = await api.get(`${base}/bytes`, { responseType: 'arraybuffer' });
+        setStatus('ok');
+      })
+      .catch((err: unknown) => {
         if (!active) return;
-        const buf: ArrayBuffer = res.data;
-        let ifds: UtifIFD[] = [];
-        try {
-          ifds = UTIF.decode(buf);
-        } catch {
-          await renderFallback();
-          return;
-        }
-        if (!ifds.length) {
-          await renderFallback();
-          return;
-        }
-        setPageCount(ifds.length);
-        const safePage = Math.min(Math.max(page, 0), ifds.length - 1);
-        const ifd = ifds[safePage];
-        try {
-          UTIF.decodeImage(buf, ifd, ifds);
-          const rgba = UTIF.toRGBA8(ifd);
-          const width = ifd.width;
-          const height = ifd.height;
-          if (!width || !height || !rgba.length) throw new Error('empty tiff');
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('no 2d ctx');
-          const imageData = new ImageData(new Uint8ClampedArray(rgba), width, height);
-          ctx.putImageData(imageData, 0, 0);
-          canvas.toBlob((blob) => {
-            if (!active || !blob) return;
-            const url = URL.createObjectURL(blob);
-            setCanvasImg((prev) => {
-              if (prev?.url) URL.revokeObjectURL(prev.url);
-              return { url, width, height };
-            });
-            setStatus('canvas');
-          }, 'image/png');
-        } catch {
-          await renderFallback();
-        }
-      } catch {
-        if (active) setStatus('error');
-      }
-    };
-    void run();
+        const message =
+          (err as { response?: { status?: number } })?.response?.status
+            ? `HTTP ${(err as { response: { status: number } }).response.status}`
+            : (err as Error)?.message ?? 'Preview failed';
+        setErrMsg(message);
+        setStatus('error');
+      });
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+      // Only revoke here if the effect didn't hand the URL over to state
+      // (e.g. rapid unmount). state-tracked URLs are revoked in the setter.
+      if (createdUrl && createdUrl !== pngUrl) URL.revokeObjectURL(createdUrl);
+    };
+    // pngUrl intentionally excluded — including it would re-fetch on every
+    // successful render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [base, page]);
 
-  // Revoke any object URLs on unmount.
+  // Revoke the last object URL on unmount.
   useEffect(() => {
-    return () => revokeAll();
+    return () => {
+      if (pngUrl) URL.revokeObjectURL(pngUrl);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -317,10 +285,15 @@ function TiffViewer({
     return <Shell><Loader2 className="h-6 w-6 animate-spin text-brand" /></Shell>;
   }
   if (status === 'error') {
-    return <Shell><Hint icon={FileWarning} text="Could not render this TIFF." /></Shell>;
+    return (
+      <Shell>
+        <Hint
+          icon={FileWarning}
+          text={`Could not render this TIFF${errMsg ? ` (${errMsg})` : ''}.`}
+        />
+      </Shell>
+    );
   }
-
-  const src = status === 'canvas' ? canvasImg?.url ?? '' : pngUrl ?? '';
 
   return (
     <div className="flex h-full flex-col">
@@ -353,10 +326,10 @@ function TiffViewer({
         <ZoomBar zoom={zoom} setZoom={setZoom} standalone={false} />
       </div>
       <div className="no-scrollbar min-h-0 flex-1 overflow-auto bg-canvas">
-        {src ? (
+        {pngUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
-            src={src}
+            src={pngUrl}
             alt="Invoice document"
             style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
             className="mx-auto block"
