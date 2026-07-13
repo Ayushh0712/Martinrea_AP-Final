@@ -1,4 +1,4 @@
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { jwtVerify } from 'jose';
 import { KeycloakAuthGuard } from './keycloak-auth.guard';
@@ -41,9 +41,10 @@ beforeEach(() => {
 describe('KeycloakAuthGuard -- local profile', () => {
   const guard = () => new KeycloakAuthGuard(configStub({ INGESTION_PROFILE: 'local' }));
 
-  it('rejects requests without a bearer token', async () => {
-    const { context } = contextFor({});
-    await expect(guard().canActivate(context)).rejects.toThrow(UnauthorizedException);
+  it('accepts requests without a bearer token (dev bypass) and injects a dev AP_Clerk', async () => {
+    const { context, req } = contextFor({});
+    await expect(guard().canActivate(context)).resolves.toBe(true);
+    expect(req.user).toMatchObject({ role: 'AP_Clerk', id: 'dev-user' });
   });
 
   it('accepts any bearer token and injects a dev AP_Clerk', async () => {
