@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Invoice OCR Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .dropzone-active { border-color: #4f46e5; background: #eef2ff; }
+    .badge { padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+    .scroll-shadow { box-shadow: inset 0 -8px 8px -8px rgba(0,0,0,.08); }
+    .spinner {
+      width: 14px; height: 14px; border: 2px solid #c7d2fe; border-top-color: #4f46e5;
+      border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .field-label { font-size: 11px; font-weight: 600; color: #475569; letter-spacing: .02em; text-transform: uppercase; }
+    .field-input { margin-top: 4px; width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; }
+    .field-input:focus { border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+
+<!-- ====================== LOGIN ====================== -->
+<div id="login-view" class="min-h-screen flex items-center justify-center px-4">
+  <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8 border border-slate-200">
+    <div class="flex flex-col items-center mb-6">
+      <div class="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xl font-bold">AI</div>
+      <h1 class="text-xl font-bold mt-3">AI Invoice OCR</h1>
+      <p class="text-sm text-slate-500">Sign in to continue</p>
+    </div>
+    <form id="login-form" class="space-y-3">
+      <div>
+        <label class="text-xs font-semibold text-slate-600">Username</label>
+        <input id="login-username" type="text" value="admin" required class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-slate-600">Password</label>
+        <input id="login-password" type="password" value="admin123" required class="mt-1 w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none" />
+      </div>
+      <p id="login-error" class="text-sm text-red-600 hidden"></p>
+      <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg transition">Sign in</button>
+    </form>
+    <p class="text-xs text-slate-400 mt-6 text-center">Default: <code>admin</code> / <code>admin123</code></p>
+  </div>
+</div>
+
+<!-- ====================== APP ====================== -->
+<div id="app-view" class="hidden">
+  <!-- Top bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-20">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">AI</div>
+        <div>
+          <h1 class="font-bold text-slate-900">AI Invoice OCR</h1>
+          <p class="text-xs text-slate-500" id="app-subtitle">Dashboard</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-sm text-slate-600 hidden md:block">Signed in as <b id="current-user"></b></span>
+        <button id="logout-btn" class="text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium">Logout</button>
+      </div>
+    </div>
+    <nav class="max-w-7xl mx-auto px-6 flex gap-1 border-t border-slate-100">
+      <button class="tab-btn px-4 py-3 text-sm font-semibold border-b-2 border-transparent hover:text-indigo-600" data-tab="upload">Upload</button>
+      <button class="tab-btn px-4 py-3 text-sm font-semibold border-b-2 border-transparent hover:text-indigo-600" data-tab="invoices">All Invoices <span id="count-all" class="ml-1 text-xs bg-slate-100 rounded px-1.5"></span></button>
+      <button class="tab-btn px-4 py-3 text-sm font-semibold border-b-2 border-transparent hover:text-indigo-600" data-tab="review">Review Queue <span id="count-review" class="ml-1 text-xs bg-amber-100 text-amber-700 rounded px-1.5"></span></button>
+      <button class="tab-btn px-4 py-3 text-sm font-semibold border-b-2 border-transparent hover:text-indigo-600" data-tab="oci">OCI Files</button>
+    </nav>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-6">
+
+    <!-- ===== Upload tab ===== -->
+    <section id="tab-upload" class="space-y-6">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="stat-card bg-white rounded-xl p-4 border border-slate-200">
+          <p class="text-xs uppercase text-slate-500 font-semibold">Total</p>
+          <p id="stat-total" class="text-3xl font-bold mt-1">—</p>
+        </div>
+        <div class="stat-card bg-white rounded-xl p-4 border border-slate-200">
+          <p class="text-xs uppercase text-slate-500 font-semibold">Pending Review</p>
+          <p id="stat-review" class="text-3xl font-bold mt-1 text-amber-600">—</p>
+        </div>
+        <div class="stat-card bg-white rounded-xl p-4 border border-slate-200">
+          <p class="text-xs uppercase text-slate-500 font-semibold">Completed</p>
+          <p id="stat-completed" class="text-3xl font-bold mt-1 text-emerald-600">—</p>
+        </div>
+        <div class="stat-card bg-white rounded-xl p-4 border border-slate-200">
+          <p class="text-xs uppercase text-slate-500 font-semibold">Failed</p>
+          <p id="stat-failed" class="text-3xl font-bold mt-1 text-rose-600">—</p>
+        </div>
+        <div class="stat-card bg-white rounded-xl p-4 border border-slate-200">
+          <p class="text-xs uppercase text-slate-500 font-semibold">Duplicates</p>
+          <p id="stat-duplicates" class="text-3xl font-bold mt-1 text-purple-600">—</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 p-6">
+        <h2 class="font-semibold text-slate-900 mb-1">Upload &amp; verify an invoice</h2>
+        <p class="text-sm text-slate-500 mb-4">Accepted: PDF, JPG, PNG, TIF • Max 10 MB • OCR runs immediately, you verify before it's saved</p>
+
+        <label id="dropzone" class="block border-2 border-dashed border-slate-300 rounded-xl p-10 text-center cursor-pointer transition">
+          <input id="file-input" type="file" class="hidden" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff" />
+          <div class="flex flex-col items-center gap-2">
+            <svg class="w-10 h-10 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.9 5.5 5.5 0 0110.62-1.1A4.5 4.5 0 0117 16h-1m-4-4v8m0-8l-3 3m3-3l3 3" /></svg>
+            <p class="font-semibold text-slate-700">Drop a file here, or <span class="text-indigo-600 underline">browse</span></p>
+            <p class="text-xs text-slate-500">OCR extracts the fields, then a review window opens so you can verify &amp; save.</p>
+          </div>
+        </label>
+
+        <div id="upload-status" class="mt-4 hidden text-sm"></div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+          <h3 class="font-semibold text-slate-900">Recent uploads</h3>
+          <button id="refresh-recent" class="text-xs text-indigo-600 hover:underline">Refresh</button>
+        </div>
+        <div id="recent-list" class="divide-y divide-slate-100"></div>
+      </div>
+    </section>
+
+    <!-- ===== All invoices tab ===== -->
+    <section id="tab-invoices" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200">
+        <div class="px-5 py-3 border-b border-slate-100">
+          <div class="flex items-center justify-between gap-4 flex-wrap">
+            <h3 class="font-semibold text-slate-900">All invoices</h3>
+            <button id="refresh-invoices" class="text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg">Refresh</button>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <select id="filter-status" class="text-sm border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500">
+              <option value="">All statuses</option>
+              <option>RECEIVED</option>
+              <option>OCR_PROCESSING</option>
+              <option>PENDING_REVIEW</option>
+              <option>PENDING_MATCH</option>
+              <option>COMPLETED</option>
+              <option>DUPLICATE_INVOICE</option>
+              <option>REJECTED</option>
+              <option>FAILED</option>
+            </select>
+            <select id="filter-doctype" class="text-sm border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500">
+              <option value="">All types</option>
+              <option value="INVOICE">Invoice</option>
+              <option value="CFDI">CFDI</option>
+              <option value="RECEIPT">Receipt</option>
+              <option value="PURCHASE_ORDER">Purchase Order</option>
+            </select>
+            <input id="filter-supplier" type="text" placeholder="Supplier…" class="text-sm border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 w-40" />
+            <input id="filter-conf-min" type="number" min="0" max="100" placeholder="Conf ≥" class="text-sm border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 w-20" />
+            <input id="filter-conf-max" type="number" min="0" max="100" placeholder="Conf ≤" class="text-sm border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500 w-20" />
+            <input id="filter-date-from" type="date" class="text-sm border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500" />
+            <input id="filter-date-to" type="date" class="text-sm border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+        <div id="invoices-table"></div>
+      </div>
+    </section>
+
+    <!-- ===== Review queue tab ===== -->
+    <section id="tab-review" class="hidden">
+      <div class="bg-white rounded-2xl border border-slate-200">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+          <div>
+            <h3 class="font-semibold text-slate-900">Review queue</h3>
+            <p class="text-xs text-slate-500">Confidence below 80% or duplicate detected</p>
+          </div>
+          <button id="refresh-review" class="text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg">Refresh</button>
+        </div>
+        <div id="review-table"></div>
+      </div>
+    </section>
+
+    <!-- ===== OCI File Manager tab ===== -->
+    <section id="tab-oci" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+          <div>
+            <h3 class="font-semibold text-slate-900">OCI Object Storage</h3>
+            <p class="text-xs text-slate-500">Browse files in the OCI bucket and trigger OCR processing</p>
+          </div>
+          <button id="refresh-oci" class="text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg">Refresh</button>
+        </div>
+        <div id="oci-status" class="hidden px-5 py-3 text-sm"></div>
+        <div id="oci-file-list" class="divide-y divide-slate-100">
+          <div class="px-5 py-10 text-center text-sm text-slate-500"><span class="spinner"></span> Loading OCI files…</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ===== Invoice detail modal ===== -->
+<div id="detail-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-30 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <div>
+        <h3 class="font-bold text-slate-900" id="detail-title">Invoice</h3>
+        <p id="detail-subtitle" class="text-xs text-slate-500 font-mono"></p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="detail-download" class="hidden text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+          Download
+        </button>
+        <button id="detail-retry" class="hidden text-sm bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold px-3 py-1.5 rounded-lg">Retry OCR</button>
+        <button id="detail-close" class="text-slate-400 hover:text-slate-700 text-2xl">&times;</button>
+      </div>
+    </div>
+    <div id="detail-body" class="overflow-auto p-6 space-y-6"></div>
+  </div>
+</div>
+
+<!-- ===== Review & Verify modal (human-in-the-loop) ===== -->
+<div id="verify-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-30 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <div>
+        <h3 class="font-bold text-slate-900">Review &amp; Verify Extracted Data</h3>
+        <p id="verify-source-file" class="text-xs text-slate-500 mt-0.5"></p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="verify-confidence-pill" class="inline-block px-3 py-1 rounded-full text-xs font-semibold"></div>
+        <button id="verify-close" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">&times;</button>
+      </div>
+    </div>
+
+    <div class="overflow-auto p-6 space-y-5">
+      <div id="verify-banner" class="hidden text-sm rounded-lg px-3 py-2 bg-amber-50 text-amber-800 border border-amber-200"></div>
+      <p class="text-sm text-slate-500">OCR ran but <b>nothing is saved yet</b> — edit anything that's wrong, then confirm to store it in the database.</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div><label class="field-label">Supplier name</label><input id="v-supplierName" class="field-input" /></div>
+        <div><label class="field-label">Invoice number</label><input id="v-invoiceNumber" class="field-input" /></div>
+        <div><label class="field-label">Invoice date</label><input id="v-invoiceDate" type="date" class="field-input" /></div>
+        <div><label class="field-label">PO number</label><input id="v-poNumber" class="field-input" /></div>
+        <div><label class="field-label">Currency</label><input id="v-currency" class="field-input" /></div>
+        <div><label class="field-label">Document type</label>
+          <select id="v-documentType" class="field-input">
+            <option value="INVOICE">INVOICE</option>
+            <option value="CFDI">CFDI</option>
+            <option value="RECEIPT">RECEIPT</option>
+            <option value="PURCHASE_ORDER">PURCHASE_ORDER</option>
+          </select>
+        </div>
+        <div><label class="field-label">Subtotal</label><input id="v-subtotal" type="number" step="any" class="field-input" /></div>
+        <div><label class="field-label">Total amount</label><input id="v-totalAmount" type="number" step="any" class="field-input" /></div>
+        <div><label class="field-label">Language</label><input id="v-language" class="field-input" /></div>
+      </div>extrajj
+
+      <div class="flex items-center gap-3 pt-1">
+        <button id="verify-save" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-lg transition">Confirm &amp; Save to database</button>
+        <button id="verify-discard" class="text-sm text-slate-500 hover:underline">Discard</button>
+        <span id="verify-status" class="ml-1 text-sm text-slate-500 hidden"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================== TOAST ====================== -->
+<div id="toast" class="fixed bottom-6 right-6 hidden z-40 px-4 py-3 rounded-lg shadow-xl text-sm font-medium"></div>
+
+<script>
+// ===================== Tiny state + helpers =====================
+const API = '/api';
+const STORAGE_KEY = 'invoiceOcrToken';
+const STORAGE_USER = 'invoiceOcrUser';
+
+let token = localStorage.getItem(STORAGE_KEY);
+let currentUser = JSON.parse(localStorage.getItem(STORAGE_USER) || 'null');
+let pollHandle = null;
+let activeTab = 'upload';
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+function showToast(message, kind = 'success') {
+  const t = $('#toast');
+  t.textContent = message;
+  t.className = `fixed bottom-6 right-6 z-40 px-4 py-3 rounded-lg shadow-xl text-sm font-medium text-white ${
+    kind === 'success' ? 'bg-emerald-600' : kind === 'error' ? 'bg-rose-600' : 'bg-slate-700'
+  }`;
+  setTimeout(() => t.classList.add('hidden'), 3500);
+  t.classList.remove('hidden');
+}
+
+async function api(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (opts.body && !(opts.body instanceof FormData) && typeof opts.body !== 'string') {
+    headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(opts.body);
+  }
+  const res = await fetch(API + path, { ...opts, headers });
+  if (res.status === 401) {
+    handleLogout();
+    throw new Error('Session expired, please log in again.');
+  }
+  const text = await res.text();
+  let json = null;
+  try { json = text ? JSON.parse(text) : null; } catch { /* ignore */ }
+  if (!res.ok) {
+    const msg = json?.message || json?.error || `HTTP ${res.status}`;
+    throw new Error(Array.isArray(msg) ? msg.join(', ') : msg);
+  }
+  return json;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  return isNaN(dt) ? '—' : dt.toLocaleString();
+}
+
+function fmtMoney(v, ccy) {
+  if (v === null || v === undefined) return '—';
+  const n = Number(v);
+  if (!isFinite(n)) return '—';
+  return `${ccy || ''} ${n.toFixed(2)}`.trim();
+}
+
+function statusBadge(status) {
+  const map = {
+    RECEIVED:           ['bg-slate-100',  'text-slate-700'],
+    OCR_PROCESSING:     ['bg-indigo-100', 'text-indigo-700'],
+    PENDING_REVIEW:     ['bg-amber-100',  'text-amber-800'],
+    PENDING_MATCH:      ['bg-sky-100',    'text-sky-700'],
+    COMPLETED:          ['bg-emerald-100','text-emerald-700'],
+    DUPLICATE_INVOICE:  ['bg-purple-100', 'text-purple-700'],
+    REJECTED:           ['bg-rose-100',   'text-rose-700'],
+    FAILED:             ['bg-rose-100',   'text-rose-800'],
+  };
+  const [bg, fg] = map[status] || ['bg-slate-100', 'text-slate-700'];
+  return `<span class="badge ${bg} ${fg}">${status || '—'}</span>`;
+}
+
+function confidenceBar(score) {
+  const s = Math.max(0, Math.min(100, Number(score) || 0));
+  const color = s >= 80 ? 'bg-emerald-500' : s >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+  return `
+    <div class="flex items-center gap-2">
+      <div class="w-24 bg-slate-100 rounded-full h-2 overflow-hidden">
+        <div class="${color} h-full" style="width:${s}%"></div>
+      </div>
+      <span class="text-xs font-semibold text-slate-600">${s.toFixed(1)}%</span>
+    </div>
+  `;
+}
+
+// ===================== Login / logout =====================
+function showLogin() {
+  $('#login-view').classList.remove('hidden');
+  $('#app-view').classList.add('hidden');
+}
+
+function showApp() {
+  $('#login-view').classList.add('hidden');
+  $('#app-view').classList.remove('hidden');
+  $('#current-user').textContent = currentUser?.username || '';
+  switchTab(activeTab);
+  startPolling();
+}
+
+function handleLogout() {
+  token = null; currentUser = null;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_USER);
+  stopPolling();
+  showLogin();
+}
+
+$('#login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#login-error').classList.add('hidden');
+  try {
+    const data = await api('/auth/login', {
+      method: 'POST',
+      body: { username: $('#login-username').value, password: $('#login-password').value },
+    });
+    token = data.accessToken;
+    currentUser = data.user;
+    localStorage.setItem(STORAGE_KEY, token);
+    localStorage.setItem(STORAGE_USER, JSON.stringify(currentUser));
+    showApp();
+    showToast('Welcome back!');
+  } catch (err) {
+    $('#login-error').textContent = err.message;
+    $('#login-error').classList.remove('hidden');
+  }
+});
+
+$('#logout-btn').addEventListener('click', handleLogout);
+
+// ===================== Tabs =====================
+function switchTab(name) {
+  activeTab = name;
+  for (const btn of $$('.tab-btn')) {
+    const active = btn.dataset.tab === name;
+    btn.classList.toggle('text-indigo-600', active);
+    btn.classList.toggle('border-indigo-600', active);
+    btn.classList.toggle('text-slate-600', !active);
+  }
+  $('#tab-upload').classList.toggle('hidden', name !== 'upload');
+  $('#tab-invoices').classList.toggle('hidden', name !== 'invoices');
+  $('#tab-review').classList.toggle('hidden', name !== 'review');
+  $('#tab-oci').classList.toggle('hidden', name !== 'oci');
+  refreshActiveTab();
+}
+
+$$('.tab-btn').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+// ===================== Upload =====================
+const dz = $('#dropzone');
+const fi = $('#file-input');
+dz.addEventListener('click', () => fi.click());
+['dragover','dragenter'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('dropzone-active'); }));
+['dragleave','drop'].forEach(ev => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('dropzone-active'); }));
+dz.addEventListener('drop', (e) => { if (e.dataTransfer.files[0]) extractAndVerify(e.dataTransfer.files[0]); });
+fi.addEventListener('change', (e) => { if (e.target.files[0]) extractAndVerify(e.target.files[0]); });
+
+// Upload → OCR extract (nothing saved) → open the verify modal. Saving happens on confirm.
+async function extractAndVerify(file) {
+  const status = $('#upload-status');
+  status.classList.remove('hidden');
+  status.innerHTML = `<span class="spinner"></span> Running OCR on <b>${file.name}</b>…`;
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const resp = await api('/invoices/extract', { method: 'POST', body: form });
+    status.classList.add('hidden');
+    fi.value = '';
+    openVerify(resp);
+  } catch (err) {
+    status.innerHTML = `
+      <div class="bg-rose-50 border border-rose-200 text-rose-800 rounded-lg p-3">
+        ❌ ${err.message}
+      </div>`;
+    showToast(err.message, 'error');
+  }
+}
+
+// ===================== Lists =====================
+function renderInvoiceRow(inv, container) {
+  const row = document.createElement('div');
+  row.className = 'flex items-center justify-between px-5 py-3 hover:bg-slate-50 cursor-pointer';
+  row.innerHTML = `
+    <div class="flex-1 min-w-0">
+      <p class="font-semibold text-slate-900 truncate">${inv.supplier_name || inv.original_filename || '—'}</p>
+      <p class="text-xs text-slate-500 font-mono">${inv.id}</p>
+    </div>
+    <div class="hidden md:block text-xs text-slate-600 w-32 truncate">${inv.invoice_number || '—'}</div>
+    <div class="hidden md:block text-xs text-slate-600 w-32">${fmtMoney(inv.total_amount, inv.currency)}</div>
+    <div class="w-40">${confidenceBar(inv.confidence_score)}</div>
+    <div class="w-44 text-right">${statusBadge(inv.status)}</div>
+  `;
+  row.addEventListener('click', () => openDetail(inv.id));
+  container.appendChild(row);
+}
+
+function renderList(items, container, emptyMsg) {
+  container.innerHTML = '';
+  if (!items.length) {
+    container.innerHTML = `<div class="px-5 py-10 text-center text-sm text-slate-500">${emptyMsg}</div>`;
+    return;
+  }
+  // Header row
+  const header = document.createElement('div');
+  header.className = 'hidden md:flex items-center justify-between px-5 py-2 bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-100';
+  header.innerHTML = `
+    <div class="flex-1">Supplier</div>
+    <div class="w-32">Invoice #</div>
+    <div class="w-32">Total</div>
+    <div class="w-40">Confidence</div>
+    <div class="w-44 text-right">Status</div>
+  `;
+  container.appendChild(header);
+  items.forEach((inv) => renderInvoiceRow(inv, container));
+}
+
+async function refreshRecent() {
+  try {
+    const data = await api('/invoices?page=1&limit=5');
+    renderList(data.items, $('#recent-list'), 'No invoices yet — upload one above.');
+    refreshStats();
+  } catch (err) { console.warn(err); }
+}
+
+async function refreshInvoices() {
+  const params = new URLSearchParams();
+  const status = $('#filter-status').value;
+  const doctype = $('#filter-doctype').value;
+  const supplier = $('#filter-supplier').value.trim();
+  const confMin = $('#filter-conf-min').value;
+  const confMax = $('#filter-conf-max').value;
+  const dateFrom = $('#filter-date-from').value;
+  const dateTo = $('#filter-date-to').value;
+  if (status) params.set('status', status);
+  if (doctype) params.set('documentType', doctype);
+  if (supplier) params.set('supplier', supplier);
+  if (confMin) params.set('confidenceMin', confMin);
+  if (confMax) params.set('confidenceMax', confMax);
+  if (dateFrom) params.set('dateFrom', dateFrom);
+  if (dateTo) params.set('dateTo', dateTo);
+  const qs = params.toString() ? `?${params}` : '';
+  try {
+    const data = await api(`/invoices${qs}`);
+    renderList(data.items, $('#invoices-table'), 'No invoices match this filter.');
+    $('#count-all').textContent = data.total ?? '';
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function refreshReview() {
+  try {
+    const data = await api('/invoices/review-queue');
+    renderList(data.items, $('#review-table'), '🎉 Nothing waiting for review.');
+    $('#count-review').textContent = data.total ?? '';
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function refreshStats() {
+  try {
+    const stats = await api('/invoices/stats');
+    $('#stat-total').textContent = stats.total ?? 0;
+    $('#stat-review').textContent = stats.pendingReview ?? 0;
+    $('#stat-completed').textContent = stats.completed ?? 0;
+    $('#stat-failed').textContent = stats.failed ?? 0;
+    $('#stat-duplicates').textContent = stats.duplicates ?? 0;
+    $('#count-all').textContent = stats.total ?? '';
+    $('#count-review').textContent = stats.pendingReview ?? '';
+  } catch (err) { /* silent */ }
+}
+
+function refreshActiveTab() {
+  refreshStats();
+  if (activeTab === 'upload') refreshRecent();
+  if (activeTab === 'invoices') refreshInvoices();
+  if (activeTab === 'review') refreshReview();
+  if (activeTab === 'oci') refreshOciFiles();
+}
+
+$('#refresh-recent').addEventListener('click', refreshRecent);
+$('#refresh-invoices').addEventListener('click', refreshInvoices);
+$('#refresh-review').addEventListener('click', refreshReview);
+$('#refresh-oci').addEventListener('click', refreshOciFiles);
+$('#filter-status').addEventListener('change', refreshInvoices);
+$('#filter-doctype').addEventListener('change', refreshInvoices);
+['filter-supplier','filter-conf-min','filter-conf-max','filter-date-from','filter-date-to']
+  .forEach(id => $('#'+id).addEventListener('change', refreshInvoices));
+
+// ===================== OCI Files =====================
+async function refreshOciFiles() {
+  const container = $('#oci-file-list');
+  const statusEl = $('#oci-status');
+  container.innerHTML = `<div class="px-5 py-10 text-center text-sm text-slate-500"><span class="spinner"></span> Loading OCI files…</div>`;
+  statusEl.classList.add('hidden');
+  try {
+    const data = await api('/oci/files');
+    container.innerHTML = '';
+    if (!data.files || data.files.length === 0) {
+      container.innerHTML = `<div class="px-5 py-10 text-center text-sm text-slate-500">No supported documents found in OCI bucket.</div>`;
+      return;
+    }
+    // Header
+    const hdr = document.createElement('div');
+    hdr.className = 'hidden md:flex px-5 py-2 bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-100 gap-4';
+    hdr.innerHTML = `<div class="flex-1">Object Name</div><div class="w-24 text-right">Size</div><div class="w-44 text-right"></div>`;
+    container.appendChild(hdr);
+    data.files.forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center px-5 py-3 hover:bg-slate-50 gap-4';
+      const sizeKb = f.size ? (f.size/1024).toFixed(1)+' KB' : '—';
+      row.innerHTML = `
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-slate-900 truncate">${f.name}</p>
+          ${f.timeModified ? `<p class="text-xs text-slate-400">${fmtDate(f.timeModified)}</p>` : ''}
+        </div>
+        <div class="w-24 text-right text-xs text-slate-500">${sizeKb}</div>
+        <div class="w-44 text-right">
+          <button class="oci-process-btn text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-1.5 rounded-lg" data-name="${f.name}">
+            Extract &amp; Verify
+          </button>
+        </div>`;
+      container.appendChild(row);
+    });
+    // Bind extract buttons → OCR (no DB write) → open verify modal
+    container.querySelectorAll('.oci-process-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const objectName = btn.dataset.name;
+        btn.disabled = true;
+        btn.textContent = 'Extracting…';
+        statusEl.classList.add('hidden');
+        try {
+          const result = await api('/oci/extract', { method: 'POST', body: { objectName } });
+          openVerify(result);
+        } catch (err) {
+          statusEl.className = 'px-5 py-3 text-sm bg-rose-50 text-rose-800 border-b border-rose-100';
+          statusEl.textContent = `❌ ${err.message}`;
+          statusEl.classList.remove('hidden');
+          showToast(err.message, 'error');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Extract & Verify';
+        }
+      });
+    });
+  } catch (err) {
+    container.innerHTML = `<div class="px-5 py-10 text-center text-sm text-rose-600">Error: ${err.message}</div>`;
+  }
+}
+
+// ===================== Detail modal =====================
+async function openDetail(id) {
+  $('#detail-modal').classList.remove('hidden');
+  $('#detail-body').innerHTML = `<div class="text-center py-10 text-slate-500"><span class="spinner"></span> Loading…</div>`;
+  $('#detail-retry').classList.add('hidden');
+  try {
+    const { invoice } = await api(`/invoices/${id}`);
+    $('#detail-title').textContent = invoice.supplier_name || invoice.original_filename || 'Invoice';
+    $('#detail-subtitle').textContent = invoice.id;
+
+    const retryBtn = $('#detail-retry');
+    if (['PENDING_REVIEW','FAILED','DUPLICATE_INVOICE','COMPLETED'].includes(invoice.status)) {
+      retryBtn.classList.remove('hidden');
+      retryBtn.onclick = async () => {
+        retryBtn.disabled = true;
+        try {
+          await api(`/invoices/${id}/retry`, { method: 'POST' });
+          showToast('Retry queued');
+          setTimeout(() => openDetail(id), 800);
+        } catch (err) { showToast(err.message, 'error'); }
+        finally { retryBtn.disabled = false; }
+      };
+    }
+
+    const field = (label, value) => `
+      <div>
+        <p class="text-xs uppercase text-slate-500 font-semibold">${label}</p>
+        <p class="font-semibold text-slate-900">${value ?? '—'}</p>
+      </div>`;
+
+    const linesHtml = (invoice.line_items || []).length
+      ? `<table class="w-full text-sm">
+          <thead><tr class="text-xs uppercase text-slate-500 text-left border-b border-slate-100">
+            <th class="py-2">Description</th><th>Qty</th><th>Unit price</th><th class="text-right">Line total</th>
+          </tr></thead>
+          <tbody>
+            ${invoice.line_items.map(li => `
+              <tr class="border-b border-slate-50">
+                <td class="py-2">${li.description ?? '—'}</td>
+                <td>${li.quantity ?? '—'}</td>
+                <td>${fmtMoney(li.unit_price, invoice.currency)}</td>
+                <td class="text-right font-semibold">${fmtMoney(li.line_total, invoice.currency)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`
+      : `<p class="text-sm text-slate-500">No line items extracted.</p>`;
+
+    const auditHtml = (invoice.audit_logs || []).length
+      ? `<ul class="space-y-2">
+          ${invoice.audit_logs.map(a => `
+            <li class="flex gap-3 text-sm">
+              <span class="text-xs text-slate-400 font-mono w-40 shrink-0">${fmtDate(a.timestamp)}</span>
+              <span class="font-semibold text-slate-700 w-44 shrink-0">${a.action}</span>
+              <span class="text-slate-600">${a.message || ''}</span>
+            </li>`).join('')}
+        </ul>`
+      : `<p class="text-sm text-slate-500">No audit entries.</p>`;
+
+    const docTypeBadge = (t) => {
+      const m = { INVOICE: 'bg-blue-100 text-blue-700', CFDI: 'bg-orange-100 text-orange-700', RECEIPT: 'bg-teal-100 text-teal-700', PURCHASE_ORDER: 'bg-violet-100 text-violet-700' };
+      return t ? `<span class="badge ${m[t]||'bg-slate-100 text-slate-700'}">${t}</span>` : '';
+    };
+    const confidenceColor = (s) => s >= 90 ? 'text-emerald-700 font-bold' : s >= 80 ? 'text-yellow-700 font-bold' : 'text-rose-700 font-bold';
+
+    $('#detail-body').innerHTML = `
+      <div class="flex flex-wrap items-center gap-3">
+        ${statusBadge(invoice.status)}
+        ${docTypeBadge(invoice.document_type)}
+        ${confidenceBar(invoice.confidence_score)}
+        <span class="${confidenceColor(invoice.confidence_score)}">${(invoice.confidence_score||0).toFixed(1)}%</span>
+        ${invoice.requires_review ? '<span class="badge bg-amber-100 text-amber-800">⚠ Needs Manual Review</span>' : ''}
+        ${invoice.cfdi_detected ? '<span class="badge bg-orange-100 text-orange-700">CFDI</span>' : ''}
+        ${invoice.language ? `<span class="badge bg-slate-100 text-slate-600">${invoice.language}</span>` : ''}
+      </div>
+
+      ${invoice.review_reason ? `<div class="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg p-3"><b>Review reason:</b> ${invoice.review_reason}</div>` : ''}
+      ${invoice.error_message ? `<div class="bg-rose-50 border border-rose-200 text-rose-800 text-sm rounded-lg p-3"><b>Error:</b> ${invoice.error_message}</div>` : ''}
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        ${field('Supplier', invoice.supplier_name)}
+        ${field('Invoice #', invoice.invoice_number)}
+        ${field('Invoice date', invoice.invoice_date)}
+        ${field('PO #', invoice.po_number)}
+        ${field('Currency', invoice.currency)}
+        ${field('Subtotal', fmtMoney(invoice.subtotal, invoice.currency))}
+        ${field('Tax', fmtMoney(invoice.tax_amount, invoice.currency))}
+        ${field('Total', fmtMoney(invoice.total_amount, invoice.currency))}
+      </div>
+
+      <div>
+        <h4 class="font-semibold mb-2">Line items</h4>
+        ${linesHtml}
+      </div>
+
+      <div>
+        <h4 class="font-semibold mb-2">Audit trail</h4>
+        ${auditHtml}
+      </div>
+
+      <details class="text-xs">
+        <summary class="cursor-pointer text-slate-500 font-semibold">File info</summary>
+        <div class="mt-2 grid grid-cols-2 gap-2 font-mono text-slate-600">
+          <div>File path: ${invoice.file_path}</div>
+          <div>Original: ${invoice.original_filename || '—'}</div>
+          <div>MIME: ${invoice.mime_type || '—'}</div>
+          <div>Size: ${invoice.file_size ? (invoice.file_size/1024).toFixed(1)+' KB' : '—'}</div>
+          <div>OCR retries: ${invoice.ocr_retry_count}</div>
+          <div>Created: ${fmtDate(invoice.created_at)}</div>
+        </div>
+      </details>
+    `;
+  } catch (err) {
+    $('#detail-body').innerHTML = `<div class="text-rose-600">${err.message}</div>`;
+  }
+}
+
+$('#detail-close').addEventListener('click', () => $('#detail-modal').classList.add('hidden'));
+$('#detail-modal').addEventListener('click', (e) => { if (e.target.id === 'detail-modal') $('#detail-modal').classList.add('hidden'); });
+
+// ===================== Review & Verify (human-in-the-loop) =====================
+let verifyCurrent = null; // { stagingId, file, fields }
+
+function openVerify(resp) {
+  verifyCurrent = resp;
+  renderVerify(resp);
+  $('#verify-status').classList.add('hidden');
+  $('#verify-modal').classList.remove('hidden');
+}
+function closeVerify() {
+  $('#verify-modal').classList.add('hidden');
+  verifyCurrent = null;
+}
+
+function vSet(id, v) { $(id).value = (v === null || v === undefined) ? '' : v; }
+function vNumOrNull(v) { const s = String(v).trim(); if (s === '') return null; const n = Number(s); return isFinite(n) ? n : null; }
+function vStrOrNull(v) { const s = String(v).trim(); return s === '' ? null : s; }
+
+function renderVerify(resp) {
+  const f = resp.fields || {};
+  vSet('#v-supplierName', f.supplierName);
+  vSet('#v-invoiceNumber', f.invoiceNumber);
+  vSet('#v-invoiceDate', f.invoiceDate);
+  vSet('#v-poNumber', f.poNumber);
+  vSet('#v-currency', f.currency);
+  $('#v-documentType').value = f.documentType || 'INVOICE';
+  vSet('#v-subtotal', f.subtotal);
+  vSet('#v-totalAmount', f.totalAmount);
+  vSet('#v-language', f.language);
+
+  const score = Number(f.confidenceScore) || 0;
+  const pill = $('#verify-confidence-pill');
+  const cls = score >= 80 ? 'bg-emerald-100 text-emerald-700' : score >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700';
+  pill.className = `inline-block px-3 py-1 rounded-full text-xs font-semibold ${cls}`;
+  pill.textContent = `Confidence ${score.toFixed(0)}%`;
+
+  const src = resp.source === 'OCI'
+    ? `OCI · ${resp.objectName || ''}`
+    : (resp.file ? `${resp.file.originalFilename} · ${(resp.file.fileSize / 1024).toFixed(1)} KB` : '');
+  $('#verify-source-file').textContent = src;
+
+  const banner = $('#verify-banner');
+  if (f.requiresReview && f.reviewReason) {
+    banner.textContent = `Flagged for review: ${f.reviewReason}`;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
+function collectVerify() {
+  return {
+    stagingId: verifyCurrent.stagingId,
+    supplierName: vStrOrNull($('#v-supplierName').value),
+    invoiceNumber: vStrOrNull($('#v-invoiceNumber').value),
+    invoiceDate: vStrOrNull($('#v-invoiceDate').value),
+    poNumber: vStrOrNull($('#v-poNumber').value),
+    currency: vStrOrNull($('#v-currency').value),
+    subtotal: vNumOrNull($('#v-subtotal').value),
+    totalAmount: vNumOrNull($('#v-totalAmount').value),
+    documentType: $('#v-documentType').value,
+    language: vStrOrNull($('#v-language').value),
+    confidenceScore: Number(verifyCurrent.fields?.confidenceScore) || 100,
+    cfdiDetected: !!verifyCurrent.fields?.cfdiDetected,
+  };
+}
+
+$('#verify-close').addEventListener('click', closeVerify);
+$('#verify-discard').addEventListener('click', closeVerify);
+$('#verify-modal').addEventListener('click', (e) => { if (e.target.id === 'verify-modal') closeVerify(); });
+
+$('#verify-save').addEventListener('click', async () => {
+  if (!verifyCurrent) return;
+  const status = $('#verify-status');
+  status.classList.remove('hidden');
+  status.innerHTML = '<span class="spinner"></span> Saving…';
+  try {
+    const resp = await api('/invoices/commit', { method: 'POST', body: collectVerify() });
+    status.classList.add('hidden');
+    closeVerify();
+    showToast('Saved to database');
+    refreshActiveTab();
+    if (resp.invoice?.id) openDetail(resp.invoice.id);
+  } catch (err) {
+    status.classList.add('hidden');
+    showToast(err.message, 'error');
+  }
+});
+
+// ===================== Polling =====================
+function startPolling() {
+  stopPolling();
+  pollHandle = setInterval(() => refreshActiveTab(), 5000);
+}
+function stopPolling() {
+  if (pollHandle) { clearInterval(pollHandle); pollHandle = null; }
+}
+
+// ===================== Boot =====================
+if (token && currentUser) showApp(); else showLogin();
+</script>
+</body>
+</html>

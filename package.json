@@ -1,0 +1,23 @@
+{
+  "name": "mre-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Martinrea AP platform - root launcher for the backend services + frontend.",
+  "scripts": {
+    "dev:backend": "concurrently -n wf,ing -c blue,green \"npm --prefix backend/workflow run start:dev\" \"npm --prefix backend/ingestion run start:dev\"",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "infra:up": "node scripts/infra-up.mjs",
+    "ports:free": "node scripts/free-ports.mjs",
+    "predev": "npm run ports:free && npm run infra:up",
+    "dev": "concurrently -n wf,ing,web -c blue,green,cyan \"npm --prefix backend/workflow run start:dev\" \"npm --prefix backend/ingestion run start:dev\" \"npm --prefix frontend run dev\"",
+    "start:backend": "concurrently -n wf,ing -c blue,green \"npm --prefix backend/workflow run start:prod\" \"npm --prefix backend/ingestion run start:prod\"",
+    "build:backend": "npm --prefix backend/workflow run build && npm --prefix backend/ingestion run build",
+    "seed": "npm --prefix backend/workflow run seed && npm --prefix backend/workflow run seed:rules",
+    "ppt": "node scripts/generate-workflow-ppt.js",
+    "install:all": "npm install && npm --prefix backend/workflow install && npm --prefix backend/ingestion install && npm --prefix frontend install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "pptxgenjs": "^4.0.1"
+  }
+}

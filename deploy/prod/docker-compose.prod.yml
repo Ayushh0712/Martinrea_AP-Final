@@ -1,0 +1,126 @@
+# Martinrea AP — production stack for the netlink-dev VM (80.225.204.210).
+#
+# Run from the PROJECT ROOT on the VM:
+#   docker compose -f deploy/prod/docker-compose.prod.yml up -d --build
+#
+# Public surface: ONLY caddy publishes a port (80). Keycloak's admin console is
+# bound to 127.0.0.1 for SSH-tunnel access (ssh -L 8080:localhost:8080 ...).
+# Everything else talks over the internal Docker network by service name.
+#
+# See deploy/DEPLOY.md for the full runbook (provisioning, seeding, smoke test).
+
+name: martinrea-ap-prod
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - frontend
+      - workflow
+      - ingestion
+
+  frontend:
+    build:
+      context: ../../frontend
+    image: martinrea-ap/frontend
+    restart: unless-stopped
+    environment:
+      # Runtime fallbacks for next.config.ts rewrites; Caddy normally routes
+      # /api/* before Next sees it.
+      API_PROXY_TARGET: http://workflow:3001
+      INGESTION_PROXY_TARGET: http://ingestion:3002
+
+  workflow:
+    build:
+      context: ../../backend/workflow
+    image: martinrea-ap/workflow-service
+    restart: unless-stopped
+    env_file:
+      - ./workflow.env
+    volumes:
+      # OCR upload scratch space (UPLOAD_DIR=./uploads -> /app/uploads).
+      - workflow_uploads:/app/uploads
+      # PO drop folders: drop files on the VM host under the project root,
+      # exactly like the local dev flow (PO-PDFs/ -> OCI, PO-Data/ -> DB).
+      - ../../PO-PDFs:/data/po-pdfs
+      - ../../PO-Data:/data/po-data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      keycloak:
+        condition: service_started
+
+  ingestion:
+    build:
+      context: ../../backend/ingestion
+    image: martinrea-ap/ingestion
+    restart: unless-stopped
+    env_file:
+      - ./ingestion.env
+    depends_on:
+      keycloak:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      # Must match DB_PASSWORD in workflow.env.
+      POSTGRES_PASSWORD: "Mre-Pg-x7Kd94-2026"
+      POSTGRES_DB: mreai
+    volumes:
+      - martinrea_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mreai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - martinrea_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Keycloak IdP. The browser never talks to it (server-side Direct Access
+  # Grant), so KC_HOSTNAME_URL is pinned to the INTERNAL address — the token
+  # issuer must equal KEYCLOAK_ISSUER in workflow.env / ingestion.env.
+  # First boot imports the 'martinrea' realm (client + roles + demo users).
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    restart: unless-stopped
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: "Mre-Kc-Adm-q2V83-2026"
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_URL: http://keycloak:8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+    ports:
+      # Admin console via SSH tunnel only: ssh -L 8080:localhost:8080 <vm>
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - martinrea_keycloak_data:/opt/keycloak/data
+      - ../../backend/workflow/keycloak/import:/opt/keycloak/data/import:ro
+
+volumes:
+  caddy_data:
+  workflow_uploads:
+  martinrea_pg_data:
+  martinrea_redis_data:
+  martinrea_keycloak_data:

@@ -1,0 +1,46 @@
+services:
+  # Redis backing the OCR pipeline's BullMQ queues (merged AI-Invoice-OCR).
+  redis:
+    image: redis:7-alpine
+    container_name: martinrea-ap-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - martinrea_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Keycloak IdP for WF-01 production auth (local dev image).
+  # Admin console: http://10.221.149.102:8080  (login admin / admin on first boot)
+  # On first boot the 'martinrea' realm is imported from ./keycloak/import:
+  #   - client      martinrea-ap  (secret matches KEYCLOAK_CLIENT_SECRET in .env)
+  #   - realm roles AP_Clerk / Plant_Manager / Finance_Director
+  #   - demo users  clerk@ / pm@ / pm2@ / fd@ / vp@martinrea.dev  (pwd Password123!)
+  # KC_HOSTNAME_URL pins the token issuer so it matches KEYCLOAK_ISSUER in .env
+  # regardless of whether Keycloak is reached via localhost or the LAN IP.
+  # Data persisted in martinrea_keycloak_data so realm + users survive restarts.
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: martinrea-keycloak
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_URL: http://localhost:8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - martinrea_keycloak_data:/opt/keycloak/data
+      - ./keycloak/import:/opt/keycloak/data/import:ro
+    restart: unless-stopped
+
+volumes:
+  martinrea_keycloak_data:
+  martinrea_redis_data:

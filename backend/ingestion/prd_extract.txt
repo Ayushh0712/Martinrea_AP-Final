@@ -1,0 +1,712 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+PRODUCT REQUIREMENTS DOCUMENT
+Martinrea Finance AP System
+Phase 1 — Foundation & Paperless
+Netlink Software Group America | Version 1.0  |  May 2025
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1. Executive Summary
+Martinrea International operates 40+ manufacturing and processing locations across North America and faces significant challenges in its Accounts Payable function. These include decentralized operations, heavy reliance on manual document handling, no centralized visibility into invoice status, and absence of real-time performance metrics. The combination results in processing delays, compliance risk, and high operational cost.
+Netlink has been selected as the development partner to build a cloud-hosted, AI-driven AP Automation Platform. The engagement is structured as a 3-Phase delivery. This document governs Phase 1 — Foundation & Paperless, which establishes the complete infrastructure, ingestion pipeline, AI-powered OCR processing, data repository, integrations with Epicor CMS, and the core human-assisted workflow for 3-way matching and electronic approvals.
+Upon completion of Phase 1, Martinrea's AP team will transition from a paper-heavy, email-based, manually reconciled process to a digitized, centrally accessible, auditable workflow — reducing manual touchpoints and creating the foundation for full AI automation in Phase 2.
+
+Phase 1 Target
+80% Human-Assisted
+Phase 2 Target
+50% Human-Assisted
+Phase 3 Target
+20% Human-Assisted
+
+
+2. Business Context & Problem Statement
+2.1 Current State Challenges
+Challenge Area
+Description
+Decentralized Operations
+40+ locations operate in silos with inconsistent AP processes, no shared system of record, and varying approval hierarchies across plants.
+Manual Document Handling
+Invoices, packing slips, and CMS receiving reports are processed manually — via email, physical mail, and shared drives — creating significant human error risk.
+Processing Delays
+Manual data entry and matching introduce delays in vendor payments, leading to missed early-payment discounts and strained supplier relationships.
+Lack of Visibility
+No centralized dashboard or status tracking. AP Managers cannot see where an invoice is in the lifecycle without contacting individual plant coordinators.
+Inefficient Matching
+2-way and 3-way matching is performed manually in spreadsheets. Inconsistent execution across plants results in duplicate payments and missed discrepancies.
+Invoice Type Complexity
+Multiple invoice types (Direct Voucher, Capital, Tooling, CFDI/Mexico) each require different handling rules, none of which are systematically enforced today.
+Lack of Real-Time Metrics
+No SLA tracking, exception rate visibility, or KPI dashboards. Leadership cannot measure AP performance or identify bottlenecks proactively.
+Inventory & MRO Gaps
+Min/max inventory levels are not frequently reviewed; missing resource IDs create reconciliation failures during matching.
+
+2.2 Phase 1 Objectives
+Phase 1 — Foundation & Paperless aims to achieve the following measurable outcomes:
+Eliminate paper-based invoice receipt — 100% of invoices enter through digital channels (email, SFTP, portal).
+Establish a centralized, searchable document repository with full audit trail.
+Automate OCR/AI data extraction from invoice images and PDFs, reducing manual keying by >80%.
+Provide a structured, UI-driven 3-way matching workbench for AP Clerks (manual matching with system-assisted discrepancy detection).
+Implement role-based electronic approval workflows with escalation and SLA enforcement.
+Integrate with Epicor CMS (all 44 instances) for live PO, Supplier, and Goods Receipt data.
+Implement CFDI validation for Mexico plants ensuring SAT regulatory compliance.
+
+
+3. Development Team Structure
+Phase 1 is delivered by a cross-functional team of 7 developers, each owning a distinct functional track. The tracks are intentionally designed with clear API boundaries so parallel development can proceed with minimal blocking dependencies.
+
+Developer
+Role
+Track
+Primary Responsibilities
+Ayush
+Full Stack Dev
+Ingestion Epic
+Email (MS Graph), SFTP polling, portal file upload REST API, pre-processing & format validation
+Abhay
+AI / OCR Engineer
+AI & OCR Epic
+Azure Document Intelligence integration, OCR JSON parser, confidence scoring, CFDI language detection
+Manav
+Integration Engineer
+External Integrations Epic
+Epicor CMS connectivity (44 sites), PO / Supplier / GR data sync, CFDI .xml SAT validation
+Roshni
+Backend / Data Engineer
+Data & Repository Epic
+PostgreSQL schema, core REST APIs (CRUD), Azure Blob Storage, audit logging, search API
+Dhwaj
+Frontend Developer
+UI/UX Track A
+Next.js dashboard, invoice data table, PDF viewer (split-screen), OCR form binding, save flow
+Yash
+Frontend Developer
+UI/UX Track B
+3-Way Match Workbench, discrepancy highlighting, exception flagging, approval submission UI
+Mohd Aman
+Backend Developer
+Workflow & Approvals Epic
+RBAC / auth roles, state machine, sequential routing rules engine, email notifications, escalation corn
+Eswar
+Integration Engineer
+External Integrations Epic
+
+Vedant S.
+Documentation
+
+
+Aditya
+Project coordinator
+
+
+Jack H.
+QA (Load, Regression)
+
+
+
+3.1 Cross-Team Integration Map
+The tracks have the following upstream/downstream dependencies that must be coordinated during Sprint Planning:
+Source
+Dependency 1
+Dependency 2
+Data Flow Notes
+Ayush (Ingestion)
+→ Roshni (Data)
+→ Dhwaj (OCR)
+Files are validated by Ayush, stored in Blob by Roshni, then sent to Azure OCR by Dhwaj.
+Dhwaj (OCR)
+→ Roshni (Data)
+→ Aditya (UI)
+Parsed OCR JSON is written to DB by Roshni, then rendered in the OCR form by Aditya.
+Manav (Integrations)
+→ Roshni (Data)
+→ Yash (Matching)
+PO / GR data cached by Manav via Roshni's DB; Yash fetches it for the workbench.
+Yash (Matching)
+→ Mohd Aman (Workflow)
+
+Successful match submission from Yash triggers Mohd Aman's workflow engine.
+Mohd Aman (Workflow)
+→ Roshni (Data)
+→ Aditya (UI)
+Workflow state changes are persisted by Roshni and reflected in Aditya's dashboard.
+
+
+4. Functional Requirements by Development Track
+4.1 Track: Ingestion Epic
+👤 Developer: Ayush
+Track: Ingestion Epic
+
+Objective: Automate the collection of invoices from external sources — Email (MS Graph), SFTP file drop, and web portal upload — into a centralized staging area for downstream OCR processing. This is the entry point of the entire AP platform.
+
+ING-01 / ING-05 — Foundation & Pre-Processing Service
+As a:  System Architect
+I want to:  have a scalable ingestion backend service with pre-processing rules
+So that:  files are validated before being saved to the repository, preventing corrupt or oversized documents from entering the pipeline
+Acceptance Criteria
+✓  Service initializes successfully in Node.js (NestJS runtime).
+✓  Incoming files pass format validation — accepted types: PDF, JPG, PNG, TIF only.
+✓  Files larger than 10 MB are rejected with a 400 error and a descriptive log entry.
+✓  Files that fail validation are quarantined in a dedicated 'Rejected' Blob container.
+✓  Validated files are handed off to Roshni's Azure Blob Storage write utility with metadata (source channel, timestamp, originating user).
+✓  Service exposes a health-check endpoint (GET /ingestion/health) returning 200 OK.
+
+ING-02 — Automated Email Ingestion
+As a:  AP System (automated service)
+I want to:  continuously monitor the designated AP email inbox and extract attachments
+So that:  vendor email submissions are automatically queued without manual download by the AP team
+Acceptance Criteria
+✓  Service authenticates securely to Microsoft 365 via MS Graph API using OAuth 2.0 client credentials flow.
+✓  Polling runs on a configurable schedule (default: every 5 minutes).
+✓  All valid attachments (PDF, JPG, PNG, TIF) are extracted and pushed to Roshni's Blob Storage API.
+✓  Processed emails are marked as 'Read' and moved to a 'AP-Processed' folder in the mailbox.
+✓  Emails with no valid attachments are moved to 'AP-No-Attachment' folder for human review.
+✓  Failed ingestion events (network timeout, auth failure) are logged and retried up to 3 times before alerting.
+✓  No files are written to local server disk at any point.
+💡 Dev Hint:  Use @microsoft/microsoft-graph-client npm package. Pass the file buffer directly to Roshni's Blob Storage upload function — do not write files to local disk. Ensure the OAuth token is refreshed automatically before expiry.
+
+ING-03 / ING-04 — SFTP & Web Portal Ingestion
+As a:  Mailroom Operator / AP Clerk
+I want to:  drop bulk scanned invoices into a network folder or upload them via the web browser
+So that:  physical invoices and portal submissions enter the digital queue without requiring manual email forwarding
+Acceptance Criteria
+✓  SFTP: Service polls the designated SFTP directory every 5 minutes using ssh2-sftp-client.
+✓  After successful download and Blob upload, files are deleted from the SFTP source to prevent duplicate ingestion.
+✓  SFTP: Failed downloads are retried up to 3 times; persistent failures generate an alert in the ops log.
+✓  Portal: A REST API endpoint (POST /api/ingestion/upload) accepts multipart/form-data from Aditya's frontend.
+✓  Portal upload returns a 201 response with a document ID and staging status for UI confirmation.
+✓  Portal: File size and type validation mirrors the core pre-processing rules.
+
+ING-06 — End-to-End Ingestion Testing
+As a:  QA Lead
+I want to:  verify all ingestion channels with automated integration tests
+So that:  we can confirm no invoices are dropped, duplicated, or incorrectly rejected across Email, SFTP, and Portal channels
+Acceptance Criteria
+✓  Integration test suite covers Email, SFTP, and Portal channels independently.
+✓  Test cases include: valid file (success), oversized file (reject), invalid type (reject), duplicate file (idempotency check).
+✓  All tests run in CI pipeline and produce a green/red gate before merging to main.
+✓  Test results artifact is produced and attached to the sprint deliverables.
+
+
+4.2  Track: AI & OCR Epic
+👤  Developer: Abhay
+Track: AI & OCR Epic
+
+Objective: Translate unstructured invoice images and PDF documents into structured, database-ready JSON using Azure Document Intelligence (Form Recognizer). Confidence scoring ensures low-quality extractions are flagged for human verification rather than silently propagated.
+
+OCR-01 / OCR-02 — Azure Setup & Document Extraction
+As a:  AP System
+I want to:  send raw invoice files received from Ayush's ingestion pipeline to Azure Document Intelligence
+So that:  we can extract structured text from invoices without manual data entry by AP staff
+Acceptance Criteria
+✓  Service connects securely to Azure Document Intelligence using provisioned API keys (stored in Azure Key Vault — not hardcoded).
+✓  Accepts file reference (Blob Storage path) from Ayush's ingestion pipeline via internal message queue.
+✓  Sends file to Azure using the Prebuilt Invoice model.
+✓  Receives the raw Azure response JSON and passes it to the mapping function.
+✓  Service is stateless and horizontally scalable.
+✓  Errors from Azure API (throttling, timeout) are retried with exponential backoff (max 3 attempts).
+
+OCR-03 — Data Mapping & Schema Normalization
+As a:  Database Engineer
+I want to:  the OCR output to be standardized and normalized
+So that:  it perfectly matches the Martinrea database schema and downstream matching engine can consume it without transformation
+Acceptance Criteria
+✓  Parser function extracts Header fields: Supplier Name, Invoice Number, Invoice Date, PO Number, Total Amount, Tax Amount, Currency.
+✓  Parser extracts Line Items: Description, Quantity, Unit Price, Line Total — as an array of objects.
+✓  Output is a clean, flat JSON object matching the Invoice and Invoice_Lines DB schema defined by Roshni.
+✓  Fields not detected by Azure are set to null (not omitted) so the UI can display them as blank for manual entry.
+✓  Unit test coverage >80% for the parser function.
+💡 Dev Hint:  Azure's raw response payload is large and complex. Write a dedicated, well-tested parser function that cherry-picks only the fields Martinrea needs. The parser output must be a clean JSON matching Roshni's Invoice schema exactly — this is the contract between your service and hers. Avoid passing raw Azure response downstream.
+
+OCR-04 / OCR-05 — Confidence Scoring & Language Detection
+As a:  AP Manager
+I want to:  the system to flag invoices where OCR confidence is low or where the document is in Spanish (CFDI/Mexico)
+So that:  my team knows which invoices require manual verification before data is trusted for matching
+Acceptance Criteria
+✓  If the aggregate confidence score across all extracted fields is <80%, output JSON includes REQUIRES_REVIEW: true and CONFIDENCE_SCORE: <value>.
+✓  REQUIRES_REVIEW invoices are placed in a dedicated 'Review Queue' status in the database.
+✓  Parser correctly identifies Mexican/Spanish CFDI terminology: 'Factura', 'IVA', 'RFC', 'CFDI', 'Emisor', 'Receptor'.
+✓  Documents identified as CFDI are flagged with DOCUMENT_TYPE: 'CFDI' in the output JSON.
+✓  CFDI-flagged documents are routed to Manav's CFDI validation service before matching.
+
+
+4.3 Track: External Integrations Epic
+👤 Developer: Manav + Eswar
+Track: External Integrations Epic
+
+Objective: Connect the AP Platform to Martinrea's source-of-truth systems — Epicor CMS (44 plant instances) and Mexico's SAT CFDI regulatory framework. All integration data is normalized to a single schema before being made available to other tracks.
+
+INT-01 / INT-02 — Master Data Sync — Suppliers & Open POs
+As a:  AP System
+I want to:  fetch active Suppliers and Open Purchase Orders from Epicor CMS nightly
+So that:  the UI, matching engine, and reporting layer always have accurate, up-to-date baseline data without querying Epicor in real time
+Acceptance Criteria
+✓  Establish secure connectivity to each Epicor CMS instance (SFTP or ODBC/JDBC as available per instance).
+✓  Nightly scheduled job (cron: 2:00 AM plant local time) fetches Supplier master data and all Open POs.
+✓  Data is upserted into the local PostgreSQL cache (managed by Roshni).
+✓  Job accepts an instanceId parameter to target specific plant instances independently.
+✓  Sync job produces a log entry per instance: records fetched, records inserted, records updated, errors.
+✓  Failed instance syncs send an alert to the ops monitoring channel but do not block other instances.
+💡 Dev Hint:  Epicor has multiple geographic instances (US plants vs Mexico plants). Your fetch logic must accept an instanceId parameter so each plant's data is clearly attributed. Coordinate with Roshni on the exact DB schema for Suppliers and POs so your upsert logic is compatible.
+
+INT-03 / INT-05 — Goods Receipt Fetch & Normalization
+As a:  Matching Engine (consumed by Yash's UI)
+I want to:  dynamically query Epicor for Goods Receipts linked to a specific PO number on demand
+So that:  Yash's 3-Way Match Workbench can display real-time receipt data alongside invoice and PO data during matching
+Acceptance Criteria
+✓  REST API endpoint: GET /api/integrations/goods-receipts?po={PONumber}&instance={instanceId}.
+✓  Returns all GR line items associated with the given PO from the specified Epicor instance.
+✓  US and Mexico Epicor instances may return different field names/formats — both must be normalized to a single, identical JSON schema before returning to the caller.
+✓  Response time target: <3 seconds for standard PO with up to 50 line items.
+✓  API returns a 404 with a descriptive message if no GRs are found for the given PO.
+✓  Pagination supported for POs with >50 GR lines.
+
+INT-04 — CFDI Validation — Mexico SAT Compliance
+As a:  Mexico AP Clerk
+I want to:  the system to parse and validate Mexican tax XML (CFDI) files
+So that:  we are legally compliant with SAT regulations and non-compliant invoices are never processed for payment
+Acceptance Criteria
+✓  Service accepts CFDI .xml file path (from Blob Storage) and parses the XML structure.
+✓  Validates presence and format of mandatory SAT fields: UUID (folio fiscal), Emisor RFC, Receptor RFC, Sello, NoCertificado, Total, IVA.
+✓  Calls SAT's public validation webservice to verify UUID authenticity (where network access permits).
+✓  Non-compliant CFDIs are flagged with CFDI_VALID: false and a specific violation reason.
+✓  Results are persisted in the Invoice record for audit trail.
+✓  All validation activity is written to the Audit_Logs table.
+
+
+4.4  Track: Data & Repository Epic
+👤  Developer: Roshni
+Track: Data & Repository Epic
+
+Objective: Design and build the secure, foundational storage and API layer that all other tracks depend on. This includes the PostgreSQL database schema, core CRUD REST APIs, Azure Blob Storage integration for document files, and the audit logging and search infrastructure.
+
+DAT-01 / DAT-03 — Database Foundation & Core CRUD APIs
+As a:  Frontend Developer (and all backend consumers)
+I want to:  have a well-designed PostgreSQL schema and standard REST APIs to manage invoice data
+So that:  the UI, matching engine, and workflow engine all have a reliable, consistent data layer to read from and write to
+Acceptance Criteria
+✓  PostgreSQL schema created and version-controlled (Flyway migrations) for: Invoices, Invoice_Lines, Suppliers, Purchase_Orders, Goods_Receipts, Users, Roles, Audit_Logs.
+✓  All tables include: id (UUID), created_at, updated_at, is_deleted (soft delete).
+✓  Core APIs functional: POST /invoices, GET /invoices, GET /invoices/:id, PATCH /invoices/:id, DELETE /invoices/:id (soft delete).
+✓  All endpoints return consistent JSON envelopes: { success, data, error, pagination }.
+✓  API input validation using class-validator; returns 422 with field-level errors on invalid input.
+✓  Database indexes on: invoice_number, supplier_id, po_number, status, created_at.
+
+DAT-02 — Azure Blob Storage — Document Management
+As a:  AP Clerk
+I want to:  original PDF and image documents to be securely stored in Azure Blob Storage and retrievable on demand
+So that:  I can view the original invoice document in the dashboard without requiring access to email inboxes or shared drives
+Acceptance Criteria
+✓  Azure Blob Storage containers provisioned: 'invoices-raw', 'invoices-processed', 'invoices-rejected'.
+✓  Utility functions built: uploadFile(buffer, containerName, blobName, metadata), deleteFile(blobName), generateSasUrl(blobName, expiryMinutes).
+✓  SAS URLs are time-limited (default: 15 minutes) and are generated on-demand by the API — never stored.
+✓  API endpoint GET /api/documents/:id/view returns a short-lived SAS URL for the frontend PDF renderer.
+✓  File metadata (size, type, upload timestamp, source channel) stored in the Invoices table alongside the blob path.
+💡 Dev Hint:  Aditya's PDF viewer uses the SAS URL you generate to render the document in the browser. Ensure SAS tokens are generated with Read-only permissions and appropriate expiry. Never return a permanent URL. Test that the SAS URL works directly in a browser before handing off to Aditya.
+
+DAT-04 / DAT-05 — Audit Logging & Advanced Search
+As a:  Auditor / AP Manager
+I want to:  search for any invoice using multiple filter criteria and see its complete history of status changes and user actions
+So that:  compliance is maintained and any payment dispute can be investigated with a complete, tamper-evident audit trail
+Acceptance Criteria
+✓  Audit trigger: Any PATCH, status change, or approval action on an Invoice automatically inserts a row into Audit_Logs with: invoice_id, action_type, performed_by (user_id), timestamp, old_value (JSON), new_value (JSON).
+✓  Audit_Logs table is append-only — no UPDATE or DELETE operations are permitted on this table.
+✓  Search API (GET /api/invoices/search) supports filtering by: Date Range, Supplier Name, Supplier ID, PO Number, Invoice Number, Status, Amount Range, Ingestion Channel.
+✓  Search supports pagination (default page size: 25) and sorting on any filter field.
+✓  Search response time target: <500ms for standard queries on up to 1 million invoice records (ensured via index strategy).
+✓  Export to CSV available from the search API (Accept: text/csv header).
+
+
+4.5  Track: UI/UX A — Dashboard & Document Viewer
+👤 Developer: Dhwaj
+Track: UI/UX Track A — Dashboard & Viewer
+
+Objective: Build the primary user interface that AP Clerks and managers use daily. This includes the Command Center Dashboard (invoice queue management) and the split-screen Document Viewer with OCR data binding — allowing users to review, correct, and save extracted invoice data.
+
+UI-A-01 / UI-A-02 — Command Center Dashboard
+As a:  AP Clerk
+I want to:  log into a centralized dashboard and see a real-time list of all incoming invoices with their current status
+So that:  I can prioritize my daily workload, identify bottlenecks, and immediately see which invoices require my attention
+Acceptance Criteria
+✓  React/Next.js project repository initialized with TypeScript, ESLint, Tailwind CSS, and React Query.
+✓  Authentication gate on all pages — unauthenticated users are redirected to login.
+✓  Main data table displays columns: Status (color-coded badge), Invoice Date, Supplier Name, Invoice Number, PO Number, Amount, Ingestion Source, Assigned To.
+✓  Table supports: pagination (25/50/100 per page), column sorting (click header), global keyword search.
+✓  Filtering sidebar: filter by Status, Supplier, Date Range, Ingestion Channel — filters persist across page refreshes (URL state).
+✓  Status badge colors: Received (grey), OCR_Processing (blue), Pending_Review (amber), Matched (green), Pending_Approval (orange), Approved (teal), Rejected (red).
+✓  Table data is fetched from Roshni's GET /api/invoices/search API with debounced query updates.
+✓  Dashboard auto-refreshes every 60 seconds without full page reload.
+
+UI-A-03 / UI-A-04 / UI-A-05 — Split-Screen Document Viewer & OCR Data Binding
+As a:  AP Clerk
+I want to:  view the original invoice PDF on the left side of the screen alongside the OCR-extracted data fields on the right
+So that:  I can verify OCR accuracy visually and correct any mistakes before the invoice proceeds to matching — preventing bad data from propagating downstream
+Acceptance Criteria
+✓  Clicking an invoice row navigates to /invoices/:id/review.
+✓  Left panel renders the original PDF using the SAS URL fetched from Roshni's GET /api/documents/:id/view endpoint.
+✓  PDF viewer supports zoom in/out and scroll; renders within the panel without downloading the file.
+✓  Right panel is a data form pre-populated with Dhwaj's OCR JSON payload (fetched from GET /api/invoices/:id).
+✓  Header fields displayed: Supplier Name, Invoice Number, Invoice Date, PO Number, Subtotal, Tax, Total Amount, Currency.
+✓  Line items displayed in an editable data grid: Description, Quantity, Unit Price, Line Total.
+✓  Form validation: Invoice Date must be a valid date, Amounts must be numeric, PO Number must match format.
+✓  REQUIRES_REVIEW flag (from Dhwaj) displays a prominent amber banner: 'OCR Confidence Low — Please Verify All Fields'.
+✓  'Save & Proceed' button calls PATCH /api/invoices/:id with the corrected data and transitions status to Pending_Match.
+✓  'Flag for Manual Review' button routes the invoice to a supervisor queue with a required comment.
+
+
+4.6 Track: UI/UX B — 3-Way Match Workbench
+👤 Developer: Yash
+Track: UI/UX Track B — Matching Workbench
+
+Objective: Build the complex reconciliation interface where AP Clerks perform manual 3-way matching. The workbench displays Invoice, PO, and Goods Receipt data side-by-side, highlights discrepancies automatically, and enables exception flagging and approval submission.
+
+UI-B-01 / UI-B-02 — 3-Way Match Workbench — Tri-Panel Layout
+As a:  AP Clerk
+I want to:  see the Invoice, Purchase Order, and Goods Receipt displayed side-by-side in a structured workbench
+So that:  I can efficiently verify that we actually received what we are being billed for, with all relevant data in one view — no toggling between systems
+Acceptance Criteria
+✓  Workbench accessible from invoice list via 'Match' action button (only enabled for invoices in Pending_Match status).
+✓  Three-column panel layout: Left = Invoice Details (read-only), Center = Purchase Order Details (fetched from cache), Right = Goods Receipt Details (fetched live).
+✓  When PO Number is confirmed in the invoice panel, UI automatically calls GET /api/integrations/goods-receipts?po={PONumber} and populates the GR panel.
+✓  Line items from all three sources are displayed as aligned rows to visually facilitate comparison.
+✓  PO and GR data includes: Line Description, Ordered Qty, Received Qty, Unit Price, Line Total.
+✓  Loading skeleton shown while GR data is being fetched from Manav's integration API.
+✓  Panel headers clearly label each source: 'Invoice (Vendor)', 'Purchase Order (CMS)', 'Goods Receipt (CMS)'.
+
+UI-B-03 / UI-B-04 — Discrepancy Detection & Exception Flagging
+As a:  AP Clerk
+I want to:  the system to automatically highlight quantity and price mismatches between the invoice and PO/GR, and allow me to formally flag discrepancies
+So that:  no invoice with unresolved discrepancies can accidentally proceed to payment — every exception is documented with a reason code
+Acceptance Criteria
+✓  Frontend comparison logic runs after all three panels are loaded.
+✓  Invoice Quantity > Goods Receipt Quantity: row highlighted in red with tooltip 'Quantity Overbilled'.
+✓  Invoice Unit Price > PO Unit Price (outside ±2% tolerance): row highlighted in amber with tooltip 'Price Variance'.
+✓  Invoice Total > PO Total: header-level alert banner displayed.
+✓  Discrepancy count displayed in a badge at the top of the workbench: 'X discrepancies detected'.
+✓  'Flag Exception' button opens a modal with: Reason Code dropdown (Price Variance, Quantity Mismatch, Duplicate Invoice, Missing PO, Other), Notes text area (required if 'Other' selected), optional file attachment.
+✓  Flagged invoices move to Exception status and enter a dedicated Exception Queue visible to AP Supervisors.
+✓  Exception log entry is created in Audit_Logs.
+
+UI-B-05 — Successful Match — Approval Submission
+As a:  AP Clerk
+I want to:  finalize a successful 3-way match and submit the invoice to the approval workflow
+So that:  approved matches move seamlessly into the authorization chain without any manual handoff or email communication
+Acceptance Criteria
+✓  'Submit for Approval' button is enabled only when: no unresolved discrepancies exist AND all three panels have data loaded.
+✓  Clicking Submit opens a confirmation modal displaying: Invoice Number, Supplier, Amount, and the next approver in the chain.
+✓  On confirmation, the UI calls POST /api/workflow/submit-match with the full document payload.
+✓  Success response transitions the invoice to Pending_Approval status and shows a success toast.
+✓  Mohd Aman's workflow engine handles all downstream routing from this point.
+✓  Submit button is disabled and shows a spinner during API call to prevent double submission.
+
+
+4.7 Track: Workflow & Approvals Epic
+👤  Developer: Mohd Aman
+Track: Workflow & Approvals Epic
+
+Objective: Implement the role-based access control system, invoice lifecycle state machine, sequential approval routing engine, automated email notification service, and SLA escalation scheduler. This module is the governance backbone of the AP platform.
+
+WF-01 / WF-02 — Role-Based Access Control & Lifecycle State Machine
+As a:  System Administrator
+I want to:  strict role definitions and a formally defined invoice status lifecycle
+So that:  unauthorized users cannot approve invoices, and the system prevents any invoice from skipping mandatory workflow steps
+Acceptance Criteria
+✓  Authentication using JWT tokens; roles stored in the token payload and validated on every API request.
+✓  Three roles implemented for Phase 1: AP_Clerk (full create/edit access), Plant_Manager (approval rights for invoices ≤$50K), Finance_Director (approval rights for all amounts).
+✓  State machine strictly governs transitions. Permitted transitions: Received → OCR_Processing → Pending_Review → Pending_Match → Matched → Pending_Approval → Approved.
+✓  Any transition not in the permitted list returns a 409 Conflict with a descriptive error.
+✓  State machine transition events are logged to Audit_Logs with timestamp and user.
+✓  Role-based UI rendering: Plant_Manager and Finance_Director see an 'Approve / Reject' action button; AP_Clerk does not.
+✓  API-level authorization: Approval endpoints return 403 Forbidden if called by an AP_Clerk.
+
+WF-03 — Sequential Approval Routing Rules Engine
+As a:  Finance Director
+I want to:  invoices above defined dollar thresholds to automatically require sequential approval from Plant Manager then Finance Director
+So that:  financial oversight is maintained and large payments cannot be authorized by a single approver
+Acceptance Criteria
+✓  Routing rule 1: Invoice Total ≤ $10,000 → routed directly to Finance_Director (single approval).
+✓  Routing rule 2: Invoice Total > $10,000 → routed to Plant_Manager first. Upon Plant_Manager approval, automatically routed to Finance_Director.
+✓  Routing rule 3: Invoice Total > $50,000 → routed to Plant_Manager → Finance_Director → VP_Finance (future extension point defined in config).
+✓  Rules are stored in a configurable Rules_Engine table — not hardcoded — so thresholds can be updated without code changes.
+✓  System tracks: current_approver_id, approval_chain (JSON array of required approvers), approvals_completed (array of completed approvals with timestamp).
+✓  Each approval step records: approver, decision (Approved/Rejected), timestamp, optional comments.
+✓  Rejected invoices return to Pending_Review status with rejection reason visible to AP_Clerk.
+
+WF-04 / WF-05 — Email Notifications & SLA Escalation
+As a:  Plant Manager / Finance Director
+I want to:  receive an automated email when my approval is required, and be automatically reminded or escalated to my manager if I do not act within the SLA window
+So that:  invoice processing keeps moving without manual follow-up calls, and SLA violations are surfaced automatically to management
+Acceptance Criteria
+✓  System sends an SMTP email (via Nodemailer or Azure Communication Services) when an invoice transitions to Pending_Approval.
+✓  Email contains: Invoice Number, Supplier, Amount, a direct deep-link to the approval screen, and the approval deadline.
+✓  Email templates are HTML, mobile-responsive, and use Martinrea branding.
+✓  A Cron job runs every hour (node-cron or Azure Logic Apps).
+✓  If an invoice has been in Pending_Approval for >48 hours, an escalation email is sent to the current approver's manager.
+✓  Escalation email clearly states: 'ACTION REQUIRED: Invoice [#] has been pending your approval for [X] hours and has been escalated.'
+✓  Escalation events are logged in Audit_Logs with escalation_type: 'SLA_BREACH'.
+✓  Maximum escalation chain: current approver → manager → VP (defined in org hierarchy table).
+💡 Dev Hint:  Use node-cron for the scheduler if deploying in a single-instance Node.js environment, or Azure Logic Apps for a cloud-native, distributed approach. Ensure email templates render correctly on mobile (Outlook, Gmail, Apple Mail). Test the escalation logic with a short SLA window (e.g., 5 minutes) in the test environment.
+
+
+5. Technical Architecture
+5.1 Approved Technology Stack
+Layer
+Technology
+Purpose
+Frontend
+React + Next.js, TypeScript, Tailwind CSS, React Query
+Dashboard, Document Viewer, Matching Workbench, Admin UI
+Mobile (Future)
+React-based PWA (Hybrid)
+Invoice approvals, exception handling (Phase 3 scope)
+Backend / API
+NestJS (Node.js), TypeScript, GraphQL, Sequelize
+Business logic, workflow orchestration, REST + GraphQL API layer
+AI / OCR
+Azure Document Intelligence (Form Recognizer)
+Invoice OCR, structured field extraction, confidence scoring
+Integrations
+REST APIs, SFTP, Event Queues
+Epicor CMS integration (44 sites), email ingestion (MS Graph)
+Database
+PostgreSQL
+AP transactional data, workflow state, audit logs, master data cache
+File Storage
+Azure Blob Storage
+Document binaries (PDFs, images) with SAS-URL access control
+Search
+PostgreSQL Full-Text + Elasticsearch
+Invoice search, KPI reporting, audit queries
+Security
+Keycloak (IdP)
+SSO, JWT authentication, RBAC, Azure AD integration
+Infrastructure
+Docker + Kubernetes
+Containerized deployment, horizontal scaling, cloud-agnostic
+Monitoring
+Datadog + Sentry
+Performance monitoring, error tracking, alerting
+CI/CD
+GitHub Actions + Argo CD
+Automated testing, build, deployment to DEV / QA / UAT / PROD
+
+
+
+
+
+
+5.2 Invoice Lifecycle — Status Flow
+The following status progression is enforced by Mohd Aman's state machine. No invoice can skip a state or move backwards without an explicit override action by an authorized role.
+
+Status
+Owner
+Meaning
+Trigger
+RECEIVED
+Ayush (Ingestion)
+Document has arrived via Email / SFTP / Portal.
+Automatic on successful file validation
+OCR_PROCESSING
+Dhwaj (OCR)
+Document is being processed by Azure Document Intelligence.
+Automatic on queue pickup
+PENDING_REVIEW
+Aditya (UI-A)
+OCR complete. AP Clerk must verify and correct extracted data.
+AP Clerk saves reviewed data
+PENDING_MATCH
+Yash (UI-B)
+Data verified. Ready for 3-way match.
+AP Clerk submits from Document Viewer
+MATCHED
+Yash (UI-B)
+3-way match completed successfully with no unresolved discrepancies.
+AP Clerk submits from Workbench
+PENDING_APPROVAL
+Mohd Aman (Workflow)
+Invoice is in the approval chain awaiting authorization.
+Automatic on match submission
+APPROVED
+Mohd Aman (Workflow)
+All required approvals obtained. Ready for payment processing.
+Final approver action
+REJECTED
+Mohd Aman (Workflow)
+Rejected by an approver. Returned to AP Clerk for investigation.
+Approver rejection action
+EXCEPTION
+Yash / Mohd Aman
+Discrepancy flagged. In exception queue for supervisor resolution.
+Exception flag from Workbench
+
+5.3 Non-Functional Requirements
+Category
+Requirement
+Target / Specification
+Performance
+API Response Time
+95th percentile <500ms for standard read APIs; <3s for Epicor GR fetch
+Performance
+OCR Throughput
+System must support processing 450,000 documents/year (~1,233/day peak)
+Availability
+Uptime Target
+99.5% uptime during business hours (06:00–22:00 ET, Mon–Fri)
+Scalability
+Horizontal Scaling
+All microservices must scale independently via Kubernetes HPA
+Security
+Data at Rest
+All database content and Blob Storage encrypted using AES-256
+Security
+Data in Transit
+All API communication enforces TLS 1.2 or higher
+Security
+Authentication
+All endpoints require valid JWT; tokens expire in 8 hours
+Compliance
+Audit Trail
+100% of state changes and user actions captured in immutable Audit_Logs
+Compliance
+CFDI / SAT
+Mexico plant invoices must pass SAT validation before matching
+Compliance
+Data Retention
+Invoice records and documents retained minimum 7 years per policy
+Reliability
+Error Handling
+All external API calls (Azure, Epicor, SAT) implement retry with exponential backoff
+Observability
+Monitoring & Alerting
+All services report to Datadog; PagerDuty alerts for Sev-1 within 2 hours
+
+
+6. Sprint Deliverables & Quality Gates
+Per the Dual-Track Agile methodology, each sprint produces mandatory deliverables that must be submitted within 2 business days of sprint closure. Martinrea will complete review within 10 business days. Non-conforming deliverables must be remediated within 10 business days of feedback.
+
+6.1 Sprint 0 — Project Initiation & Foundation
+Deliverable
+Description / Acceptance Criteria
+Figma UI/UX Wireframes
+High-level flows for Dashboard, Document Viewer, Matching Workbench, and Approval screens
+Solution Architecture
+Approved architecture diagram with cloud components, service boundaries, and integration points
+Physical Data Model
+PostgreSQL schema for all Phase 1 tables, documented with entity-relationship diagram
+Development Standards
+Coding standards, branching strategy, PR review process, and Definition of Done
+Test Strategy
+Test plan covering unit, integration, functional, and UAT test approach
+Environment Readiness
+DEV environment operational; CI/CD pipeline running; Keycloak provisioned
+Sprint 1 Backlog Baseline
+All Sprint 1 user stories estimated, acceptance criteria finalized, DoR confirmed
+
+6.2 Recurring Sprint Deliverables (Sprint 1 Onwards)
+Deliverable
+Details & Acceptance Standard
+Figma UI/UX
+Updated Figma designs for all screens developed in the sprint; includes mobile-responsive states
+Physical Data Model
+Delta changes to the DB schema with migration scripts (Flyway)
+Technical Design Doc
+Updated TDD including architecture changes, API contracts, and integration diagrams
+Source Code
+Committed to Martinrea's repository; feature branches merged to main via reviewed PRs
+Unit Test Code
+Automated unit tests with >80% code coverage for all new service functions
+Code Quality Report
+SonarQube / ESLint report; no critical or blocker issues permitted
+Test Scenarios
+Functional test scenarios mapped to acceptance criteria for all delivered stories
+Test Cases
+Step-by-step test cases with expected results for each scenario
+Test Results
+Executed test results showing pass/fail for Unit, Functional, Integration, and applicable NFRs
+Defects Log
+All defects raised, categorized by severity, with status (Open / Fixed / Verified / Deferred)
+Sprint Demo
+Live demo recording or session covering all completed user stories; demo artifacts archived
+
+6.3 SLA Response Matrix
+Severity
+Definition
+Response SLA
+Resolution Goal
+Sev-1: Critical
+System down, data corruption, security breach. No workaround.
+2 Hours
+< 24 Hours
+Sev-2: High
+Major feature failure (e.g., OCR stalled, workflow escalation fails). Workaround is difficult.
+4 Hours
+< 48 Hours
+Sev-3: Medium
+Functional bug (e.g., search filter not persisting) but business process can continue via workaround.
+24 Hours
+Next Sprint
+Sev-4: Low
+Cosmetic issues (UI alignment, typos) or enhancement requests.
+N/A
+Backlog / Future Release
+
+
+7. Assumptions & Dependencies
+7.1 Martinrea Obligations (Pre-Conditions)
+VPN/VDI access to Epicor CMS and email servers must be provisioned for the Netlink team by Week 1 of Sprint 1.
+Active, authorized credentials for all third-party supplier portals (CFDI Mexico, Xeeva) must be provided.
+Finance SME / Product Owner must be available for requirement decisions within 24 hours of request.
+DEV, QA/UAT, and PROD cloud environments must be provisioned by Martinrea on Azure.
+Delegation of Authority (DOA) matrix and GL Chart of Accounts logic must be provided before Workflow development begins.
+UAT feedback must be consolidated and returned within the 2-week feedback window to avoid Go-Live date slippage.
+
+7.2 Technical Assumptions
+Epicor CMS integration: Legacy CMS supports standard database (ODBC/JDBC) or file-based (CSV/XML) integration. Custom API wrappers are out of scope for Phase 1.
+Data Quality: Vendor Master and PO data in CMS is reasonably clean. Extensive data cleansing is out of scope.
+Volume: Architecture is sized for ~450K annual documents. Significant spikes above this may require infrastructure resizing (change request).
+Input Quality: At least 80% of invoices are native digital PDFs. High volumes of handwritten or poorly-scanned paper will increase manual correction effort.
+CFDI: SAT validation webservice is accessible from the Martinrea Azure network.
+
+7.3 Out of Scope — Phase 1
+AI/ML automated 2-way and 3-way matching (Phase 2 scope).
+Automated voucher creation into Epicor CMS (Phase 2 scope).
+Supplier Self-Service Portal (Phase 3 scope).
+Daily bank reconciliation and payment automation (Phase 3 scope).
+Advanced analytics, SLA dashboards, and KPI reporting (Phase 2/3 scope).
+App Store / Google Play Store deployment of mobile app (Martinrea responsibility if required in Phase 1).
+RPA bot maintenance and AI model retraining post-deployment (separate Support contract).

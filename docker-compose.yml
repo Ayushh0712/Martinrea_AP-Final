@@ -1,0 +1,50 @@
+# Martinrea AP — backend stack (workflow + ingestion).
+#
+#   docker compose up --build                 # the 2 services (use a server DB)
+#   docker compose --profile local up --build # also start Redis
+#
+# Each service reads its OWN .env (env_file). For a LOCAL Redis set
+# REDIS_HOST=redis in those .env files; for the server DB point them at the
+# server host. See INTEGRATION.md.
+
+services:
+  workflow-service:
+    build:
+      context: "./backend/workflow"
+    image: martinrea-ap/workflow-service
+    env_file:
+      - "./backend/workflow/.env"
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  ingestion:
+    build:
+      context: "./backend/ingestion"
+    image: martinrea-ap/ingestion
+    env_file:
+      - "./backend/ingestion/.env"
+    ports:
+      - "3002:3002"
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ---- Optional local infra (enable with: --profile local) ----
+  redis:
+    image: redis:7-alpine
+    profiles: ["local"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - martinrea_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  martinrea_redis_data:

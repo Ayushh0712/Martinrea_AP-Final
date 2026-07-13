@@ -1,0 +1,50 @@
+# ─── Dependencies ───────────────────────────────────────────────────────────
+node_modules/
+.pnp/
+.pnp.js
+
+# ─── Build output / caches ──────────────────────────────────────────────────
+dist/
+build/
+out/
+.next/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+.vite/
+.turbo/
+
+# ─── Environment files (MAY CONTAIN SECRETS) ────────────────────────────────
+# Ignore every real env file; keep only the *.example templates that document
+# the required variables without any secret values.
+.env
+.env.*
+*.env
+!.env.example
+!.env.*.example
+
+# ─── OCR / runtime artifacts ────────────────────────────────────────────────
+uploads/
+logs/
+*.log
+.local-redis/
+.local-storage/
+.local-maildir/
+.local-sftp/
+
+# ─── Local PO drop folders (documents/data synced to OCI at runtime) ─────────
+PO-PDFs/**/*.pdf
+PO-Data/**/*.json
+
+# ─── Editor / OS / IDE state ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.cursor/
+*.suo
+*.sw?
+
+# ─── Misc local scratch ─────────────────────────────────────────────────────
+prd_dump.txt
+prd_err.txt

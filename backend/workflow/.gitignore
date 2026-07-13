@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.tsbuildinfo
+
+# OCR pipeline runtime artifacts
+uploads/
+logs/
+.local-redis/

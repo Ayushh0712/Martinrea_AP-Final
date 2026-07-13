@@ -1,0 +1,114 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+6 0 obj
+<< /Length 3521 >>
+stream
+BT /F2 14 Tf 50 740 Td (Orion Precision Components GmbH) Tj ET
+BT /F2 16 Tf 470 740 Td (INVOICE) Tj ET
+BT /F1 9 Tf 50 724 Td (Werkstrasse 12, 70565 Stuttgart, Germany) Tj ET
+BT /F1 10 Tf 400 688 Td (Invoice #: INV-7788) Tj ET
+BT /F1 10 Tf 400 672 Td (Invoice Date: 2026-06-15) Tj ET
+BT /F1 10 Tf 400 656 Td (Due Date: 2026-07-15) Tj ET
+BT /F1 10 Tf 400 640 Td (PO Number: PO-5501) Tj ET
+BT /F1 10 Tf 400 624 Td (Currency: USD) Tj ET
+BT /F2 10 Tf 50 592 Td (FROM \(SUPPLIER\)) Tj ET
+BT /F2 10 Tf 330 592 Td (BILL TO) Tj ET
+BT /F1 10 Tf 50 576 Td (Orion Precision Components GmbH) Tj ET
+BT /F1 10 Tf 330 576 Td (Martinrea Manufacturing Inc.) Tj ET
+BT /F1 10 Tf 50 560 Td (Werkstrasse 12, 70565 Stuttgart) Tj ET
+BT /F1 10 Tf 330 560 Td (4820 Constellation Dr, Detroit, MI) Tj ET
+BT /F1 10 Tf 50 544 Td (Tax ID: DE 812 345 678) Tj ET
+BT /F1 10 Tf 330 544 Td (Attn: Accounts Payable) Tj ET
+BT /F2 10 Tf 50 507 Td (Item Code) Tj ET
+BT /F2 10 Tf 130 507 Td (Description) Tj ET
+BT /F2 10 Tf 330 507 Td (Qty) Tj ET
+BT /F2 10 Tf 400 507 Td (Unit Price) Tj ET
+BT /F2 10 Tf 480 507 Td (Line Total) Tj ET
+BT /F1 10 Tf 50 485 Td (OPC-1001) Tj ET
+BT /F1 10 Tf 130 485 Td (Hex Bolt M8x40) Tj ET
+BT /F1 10 Tf 330 485 Td (500) Tj ET
+BT /F1 10 Tf 400 485 Td ($0.42) Tj ET
+BT /F1 10 Tf 480 485 Td ($210.00) Tj ET
+BT /F1 10 Tf 50 467 Td (OPC-1002) Tj ET
+BT /F1 10 Tf 130 467 Td (Hex Nut M8) Tj ET
+BT /F1 10 Tf 330 467 Td (500) Tj ET
+BT /F1 10 Tf 400 467 Td ($0.18) Tj ET
+BT /F1 10 Tf 480 467 Td ($90.00) Tj ET
+BT /F1 10 Tf 50 449 Td (OPC-2050) Tj ET
+BT /F1 10 Tf 130 449 Td (Flat Washer 8mm) Tj ET
+BT /F1 10 Tf 330 449 Td (1000) Tj ET
+BT /F1 10 Tf 400 449 Td ($0.05) Tj ET
+BT /F1 10 Tf 480 449 Td ($50.00) Tj ET
+BT /F1 10 Tf 50 431 Td (OPC-3300) Tj ET
+BT /F1 10 Tf 130 431 Td (Steel Bracket L-Type) Tj ET
+BT /F1 10 Tf 330 431 Td (120) Tj ET
+BT /F1 10 Tf 400 431 Td ($4.75) Tj ET
+BT /F1 10 Tf 480 431 Td ($570.00) Tj ET
+BT /F1 10 Tf 50 413 Td (OPC-4410) Tj ET
+BT /F1 10 Tf 130 413 Td (Bearing 6204-2RS) Tj ET
+BT /F1 10 Tf 330 413 Td (60) Tj ET
+BT /F1 10 Tf 400 413 Td ($3.90) Tj ET
+BT /F1 10 Tf 480 413 Td ($234.00) Tj ET
+BT /F1 10 Tf 50 395 Td (OPC-5120) Tj ET
+BT /F1 10 Tf 130 395 Td (Rubber Grommet 12mm) Tj ET
+BT /F1 10 Tf 330 395 Td (400) Tj ET
+BT /F1 10 Tf 400 395 Td ($0.22) Tj ET
+BT /F1 10 Tf 480 395 Td ($88.00) Tj ET
+BT /F1 10 Tf 50 377 Td (OPC-6001) Tj ET
+BT /F1 10 Tf 130 377 Td (Alu Spacer 10mm) Tj ET
+BT /F1 10 Tf 330 377 Td (250) Tj ET
+BT /F1 10 Tf 400 377 Td ($1.10) Tj ET
+BT /F1 10 Tf 480 377 Td ($275.00) Tj ET
+BT /F1 10 Tf 50 359 Td (OPC-7210) Tj ET
+BT /F1 10 Tf 130 359 Td (Spring Pin 6x30) Tj ET
+BT /F1 10 Tf 330 359 Td (300) Tj ET
+BT /F1 10 Tf 400 359 Td ($0.35) Tj ET
+BT /F1 10 Tf 480 359 Td ($105.00) Tj ET
+BT /F1 10 Tf 50 341 Td (OPC-8055) Tj ET
+BT /F1 10 Tf 130 341 Td (Shaft Seal 25mm) Tj ET
+BT /F1 10 Tf 330 341 Td (80) Tj ET
+BT /F1 10 Tf 400 341 Td ($2.45) Tj ET
+BT /F1 10 Tf 480 341 Td ($196.00) Tj ET
+BT /F1 10 Tf 50 323 Td (OPC-9900) Tj ET
+BT /F1 10 Tf 130 323 Td (Retaining Ring 20mm) Tj ET
+BT /F1 10 Tf 330 323 Td (150) Tj ET
+BT /F1 10 Tf 400 323 Td ($0.48) Tj ET
+BT /F1 10 Tf 480 323 Td ($72.00) Tj ET
+BT /F2 10 Tf 350 291 Td (Subtotal:) Tj ET
+BT /F1 10 Tf 480 291 Td ($1,890.00) Tj ET
+BT /F2 10 Tf 350 273 Td (Tax \(8%\):) Tj ET
+BT /F1 10 Tf 480 273 Td ($151.20) Tj ET
+BT /F2 10 Tf 350 255 Td (Total Due:) Tj ET
+BT /F2 10 Tf 480 255 Td ($2,041.20) Tj ET
+BT /F1 10 Tf 50 219 Td (Payment Terms: Net 30) Tj ET
+BT /F1 10 Tf 50 203 Td (Please reference the invoice number on all remittance correspondence.) Tj ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000321 00000 n 
+0000000396 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+3969
+%%EOF

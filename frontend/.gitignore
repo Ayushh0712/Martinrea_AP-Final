@@ -1,0 +1,29 @@
+node_modules
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# Vite (legacy)
+dist
+dist-ssr
+*.local
+.vite
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.vercel

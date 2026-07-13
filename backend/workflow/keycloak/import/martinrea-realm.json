@@ -1,0 +1,115 @@
+{
+  "realm": "martinrea",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "accessTokenLifespan": 1800,
+  "roles": {
+    "realm": [
+      { "name": "AP_Clerk", "description": "Creates and edits invoices; cannot approve." },
+      { "name": "Plant_Manager", "description": "First approver for invoices over $10,000." },
+      { "name": "Finance_Director", "description": "Sole approver up to $10,000; second approver above." },
+      { "name": "VP_Finance", "description": "Final approver for invoices over $50,000 (WF-03 Tier-3)." }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "martinrea-ap",
+      "name": "Martinrea AP Workflow Service",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "y8ycGTJrsMPNpe4l1v45v0E2G1vqaJMB",
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email"],
+      "protocolMappers": [
+        {
+          "name": "audience-martinrea-ap",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "martinrea-ap",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "plant_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "plant_id",
+            "claim.name": "plant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "clerk@martinrea.dev",
+      "email": "clerk@martinrea.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "AP Clerk",
+      "attributes": { "plant_id": ["PLT-001"] },
+      "credentials": [{ "type": "password", "value": "Password123!", "temporary": false }],
+      "realmRoles": ["AP_Clerk"]
+    },
+    {
+      "username": "pm@martinrea.dev",
+      "email": "pm@martinrea.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "Plant Manager One",
+      "attributes": { "plant_id": ["PLT-001"] },
+      "credentials": [{ "type": "password", "value": "Password123!", "temporary": false }],
+      "realmRoles": ["Plant_Manager"]
+    },
+    {
+      "username": "pm2@martinrea.dev",
+      "email": "pm2@martinrea.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "Plant Manager Two",
+      "attributes": { "plant_id": ["PLT-002"] },
+      "credentials": [{ "type": "password", "value": "Password123!", "temporary": false }],
+      "realmRoles": ["Plant_Manager"]
+    },
+    {
+      "username": "fd@martinrea.dev",
+      "email": "fd@martinrea.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "Finance Director",
+      "credentials": [{ "type": "password", "value": "Password123!", "temporary": false }],
+      "realmRoles": ["Finance_Director"]
+    },
+    {
+      "username": "vp@martinrea.dev",
+      "email": "vp@martinrea.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Demo",
+      "lastName": "VP Finance",
+      "credentials": [{ "type": "password", "value": "Password123!", "temporary": false }],
+      "realmRoles": ["VP_Finance"]
+    }
+  ]
+}

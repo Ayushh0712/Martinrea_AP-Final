@@ -1,0 +1,64 @@
+# Representative Kubernetes manifests for the workflow-service (PRD 5.1 / 5.3:
+# containerized deployment + horizontal scaling via HPA). Replicate per service
+# (ingestion, integrations) by changing the image, port and env.
+#
+# Secrets (DB, JWT, OCI, SMTP, Keycloak) come from a Kubernetes Secret named
+# `martinrea-ap-secrets` - do NOT bake them into the image.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-service
+  labels: { app: workflow-service }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: workflow-service }
+  template:
+    metadata:
+      labels: { app: workflow-service }
+    spec:
+      containers:
+        - name: workflow-service
+          image: martinrea-ap/workflow-service:latest
+          ports:
+            - containerPort: 3001
+          envFrom:
+            - secretRef: { name: martinrea-ap-secrets }
+          readinessProbe:
+            httpGet: { path: /api/health, port: 3001 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /api/health, port: 3001 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflow-service
+spec:
+  selector: { app: workflow-service }
+  ports:
+    - port: 80
+      targetPort: 3001
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: workflow-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: workflow-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }

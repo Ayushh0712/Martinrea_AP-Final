@@ -1,0 +1,45 @@
+# ING-06 acceptance criteria: all tests run in CI and produce a green/red
+# gate before merging to main. Coverage thresholds (70% branches, 80%
+# lines/functions/statements) are enforced by the Jest config itself.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests (with coverage gate)
+        run: npm run test:cov
+
+      - name: End-to-end channel suite (ING-06)
+        run: npm run test:e2e
+
+      - name: Archive coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14

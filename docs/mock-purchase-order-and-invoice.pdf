@@ -1,0 +1,349 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+5 0 obj
+<< /Length 2682 >>
+stream
+BT
+/F1 18 Tf
+48 744 Td
+(Mock Purchase Order and Invoice Structure) Tj
+/F1 15 Tf
+48 706 Td
+(Mock Purchase Order) Tj
+/F1 10 Tf
+48 686 Td
+(Use this as the standard purchase order shape for testing the AP workflow.) Tj
+/F2 8.5 Tf
+58 664 Td
+({) Tj
+/F2 8.5 Tf
+58 653 Td
+(  poNumber: 'PO-1001',) Tj
+/F2 8.5 Tf
+58 642 Td
+(  supplierCode: 'SUP-001',) Tj
+/F2 8.5 Tf
+58 631 Td
+(  supplierId: 'EIN-12-3456789', // or supplier master ID, but keep consistent) Tj
+/F2 8.5 Tf
+58 620 Td
+(  supplierName: 'Acme Steel Co.',) Tj
+/F2 8.5 Tf
+58 609 Td
+(  plantId: 'PLT-001',) Tj
+/F2 8.5 Tf
+58 598 Td
+(  currency: 'USD',) Tj
+/F2 8.5 Tf
+58 587 Td
+(  totalAmount: 5400.00,) Tj
+/F2 8.5 Tf
+58 576 Td
+(  orderTotal: 5400.00,) Tj
+/F2 8.5 Tf
+58 565 Td
+(  reservedAmount: 0.00,) Tj
+/F2 8.5 Tf
+58 554 Td
+(  consumedAmount: 0.00,) Tj
+/F2 8.5 Tf
+58 543 Td
+(  status: 'OPEN',) Tj
+/F2 8.5 Tf
+58 532 Td
+(  issuedDate: '2026-01-10',) Tj
+/F2 8.5 Tf
+58 521 Td
+(  expectedDeliveryDate: '2026-02-10',) Tj
+/F2 8.5 Tf
+58 510 Td
+(  instanceId: 'ERP-INST-001',) Tj
+/F2 8.5 Tf
+58 499 Td
+(  notes: 'Hot-rolled steel coils - Q1 order',) Tj
+/F2 8.5 Tf
+58 488 Td
+(  lines: [) Tj
+/F2 8.5 Tf
+58 477 Td
+(    {) Tj
+/F2 8.5 Tf
+58 466 Td
+(      lineNumber: 1,) Tj
+/F2 8.5 Tf
+58 455 Td
+(      itemCode: 'STL-HR-0.25x48',) Tj
+/F2 8.5 Tf
+58 444 Td
+(      description: 'Hot-rolled steel coil 0.25 x 48 wide',) Tj
+/F2 8.5 Tf
+58 433 Td
+(      orderQuantity: 15,) Tj
+/F2 8.5 Tf
+58 422 Td
+(      reservedQuantity: 0,) Tj
+/F2 8.5 Tf
+58 411 Td
+(      consumedQuantity: 0,) Tj
+/F2 8.5 Tf
+58 400 Td
+(      unitOfMeasure: 'MT',) Tj
+/F2 8.5 Tf
+58 389 Td
+(      unitPrice: 270.0000,) Tj
+/F2 8.5 Tf
+58 378 Td
+(      lineTotal: 4050.00,) Tj
+/F2 8.5 Tf
+58 367 Td
+(      status: 'OPEN') Tj
+/F2 8.5 Tf
+58 356 Td
+(    }) Tj
+/F2 8.5 Tf
+58 345 Td
+(  ]) Tj
+/F2 8.5 Tf
+58 334 Td
+(}) Tj
+/F1 12 Tf
+48 313 Td
+(Most Important PO Fields For Matching) Tj
+/F1 10 Tf
+60 296 Td
+(- poNumber) Tj
+/F1 10 Tf
+60 282 Td
+(- supplierName) Tj
+/F1 10 Tf
+60 268 Td
+(- currency) Tj
+/F1 10 Tf
+60 254 Td
+(- totalAmount) Tj
+/F1 10 Tf
+60 240 Td
+(- Line itemCode) Tj
+/F1 10 Tf
+60 226 Td
+(- Line orderQuantity) Tj
+/F1 10 Tf
+60 212 Td
+(- Line reservedQuantity) Tj
+/F1 10 Tf
+60 198 Td
+(- Line consumedQuantity) Tj
+/F1 10 Tf
+60 184 Td
+(- Line unitPrice) Tj
+/F1 15 Tf
+48 160 Td
+(Mock Invoice) Tj
+/F1 10 Tf
+48 140 Td
+(Use this as the standard invoice shape for testing the AP workflow.) Tj
+/F2 8.5 Tf
+58 118 Td
+({) Tj
+/F2 8.5 Tf
+58 107 Td
+(  invoiceNumber: 'INV-2026-001',) Tj
+/F2 8.5 Tf
+58 96 Td
+(  supplierName: 'Acme Steel Co.',) Tj
+/F2 8.5 Tf
+58 85 Td
+(  supplierId: 'SUP-001',) Tj
+/F2 8.5 Tf
+58 74 Td
+(  supplierTaxId: 'EIN-12-3456789',) Tj
+/F2 8.5 Tf
+58 63 Td
+(  poNumber: 'PO-1001',) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 2752 >>
+stream
+BT
+/F2 8.5 Tf
+58 744 Td
+(  purchaseOrderId: '<resolved PO UUID if seeding directly>',) Tj
+/F2 8.5 Tf
+58 733 Td
+(  invoiceDate: '2026-01-18',) Tj
+/F2 8.5 Tf
+58 722 Td
+(  dueDate: '2026-02-17',) Tj
+/F2 8.5 Tf
+58 711 Td
+(  subtotal: 5000.00,) Tj
+/F2 8.5 Tf
+58 700 Td
+(  discount: 100.00,) Tj
+/F2 8.5 Tf
+58 689 Td
+(  taxAmount: 500.00,) Tj
+/F2 8.5 Tf
+58 678 Td
+(  totalAmount: 5400.00,) Tj
+/F2 8.5 Tf
+58 667 Td
+(  currency: 'USD',) Tj
+/F2 8.5 Tf
+58 656 Td
+(  billToName: 'Martinrea Plant - Windsor',) Tj
+/F2 8.5 Tf
+58 645 Td
+(  paymentTerm: 'Net 30',) Tj
+/F2 8.5 Tf
+58 634 Td
+(  ingestionChannel: 'EMAIL',) Tj
+/F2 8.5 Tf
+58 623 Td
+(  plantId: 'PLT-001',) Tj
+/F2 8.5 Tf
+58 612 Td
+(  status: 'PENDING_MATCH',) Tj
+/F2 8.5 Tf
+58 601 Td
+(  cfdiValid: null,) Tj
+/F2 8.5 Tf
+58 590 Td
+(  lines: [) Tj
+/F2 8.5 Tf
+58 579 Td
+(    {) Tj
+/F2 8.5 Tf
+58 568 Td
+(      lineNumber: 1,) Tj
+/F2 8.5 Tf
+58 557 Td
+(      itemCode: 'STL-HR-0.25x48',) Tj
+/F2 8.5 Tf
+58 546 Td
+(      description: 'Hot-rolled steel coil 0.25 x 48 wide',) Tj
+/F2 8.5 Tf
+58 535 Td
+(      skuOrPartNumber: 'STL-HR-0.25x48 / SKU-10011',) Tj
+/F2 8.5 Tf
+58 524 Td
+(      quantity: 15,) Tj
+/F2 8.5 Tf
+58 513 Td
+(      unitOfMeasure: 'MT',) Tj
+/F2 8.5 Tf
+58 502 Td
+(      unitPrice: 270.0000,) Tj
+/F2 8.5 Tf
+58 491 Td
+(      lineTotal: 4050.00) Tj
+/F2 8.5 Tf
+58 480 Td
+(    }) Tj
+/F2 8.5 Tf
+58 469 Td
+(  ]) Tj
+/F2 8.5 Tf
+58 458 Td
+(}) Tj
+/F1 12 Tf
+48 437 Td
+(Most Important Invoice Fields For Matching) Tj
+/F1 10 Tf
+60 420 Td
+(- invoiceNumber) Tj
+/F1 10 Tf
+60 406 Td
+(- supplierName) Tj
+/F1 10 Tf
+60 392 Td
+(- poNumber) Tj
+/F1 10 Tf
+60 378 Td
+(- currency) Tj
+/F1 10 Tf
+60 364 Td
+(- totalAmount) Tj
+/F1 10 Tf
+60 350 Td
+(- Line itemCode) Tj
+/F1 10 Tf
+60 336 Td
+(- Line quantity) Tj
+/F1 10 Tf
+60 322 Td
+(- Line unitPrice) Tj
+/F1 15 Tf
+48 298 Td
+(Testing Notes) Tj
+/F1 10 Tf
+60 278 Td
+(- Keep supplierName identical between the invoice and purchase order when testing) Tj
+/F1 10 Tf
+60 264 Td
+(  successful matches.) Tj
+/F1 10 Tf
+60 250 Td
+(- Keep currency identical between the invoice and purchase order when testing) Tj
+/F1 10 Tf
+60 236 Td
+(  successful matches.) Tj
+/F1 10 Tf
+60 222 Td
+(- Match invoice lines to PO lines through itemCode.) Tj
+/F1 10 Tf
+60 208 Td
+(- A line can only draw down the remaining PO quantity: orderQuantity -) Tj
+/F1 10 Tf
+60 194 Td
+(  reservedQuantity - consumedQuantity.) Tj
+/F1 10 Tf
+60 180 Td
+(- Use reservedAmount, consumedAmount, reservedQuantity, and consumedQuantity to test) Tj
+/F1 10 Tf
+60 166 Td
+(  partial draw-down and multiple invoices against the same PO.) Tj
+/F1 10 Tf
+60 152 Td
+(- Keep supplier identifiers consistent. Prefer supplierCode for values like SUP-001) Tj
+/F1 10 Tf
+60 138 Td
+(  and supplierTaxId or tax-ID fields for values like EIN-12-3456789.) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000191 00000 n 
+0000000259 00000 n 
+0000002993 00000 n 
+0000003129 00000 n 
+0000005933 00000 n 
+trailer
+<< /Size 9 /Root 1 0 R >>
+startxref
+6069
+%%EOF

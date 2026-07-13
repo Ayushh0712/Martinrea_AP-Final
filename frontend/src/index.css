@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 33% 97%;
+    --foreground: 215 35% 8%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 35% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 35% 8%;
+
+    --primary: 207 100% 20%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 215 25% 15%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 12% 45%;
+
+    --accent: 220 14% 96%;
+    --accent-foreground: 215 25% 15%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 16% 90%;
+    --input: 220 16% 90%;
+    --ring: 207 100% 20%;
+
+    --radius: 10px;
+  }
+
+  * {
+    @apply border-border;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-canvas text-ink;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(15, 25, 35, 0.18);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(15, 25, 35, 0.32);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+  }
+}
+
+@layer utilities {
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(229, 233, 240, 0.6) 0%,
+      rgba(229, 233, 240, 1) 50%,
+      rgba(229, 233, 240, 0.6) 100%
+    );
+    background-size: 200px 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+  .glass {
+    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.7);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+}

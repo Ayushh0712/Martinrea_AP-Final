@@ -1,0 +1,21 @@
+# Reverse proxy for the Martinrea AP stack — the ONLY publicly exposed service.
+# Mirrors the dev-time Next.js rewrites (frontend/next.config.ts):
+#   /api/ingestion/*  -> ingestion service
+#   /api/*            -> workflow service (auth, invoices, ocr, documents, ...)
+#   everything else   -> Next.js frontend
+#
+# :80 = plain HTTP on the VM's public IP (no domain -> no Let's Encrypt).
+# Caddy imposes no request-body limit by default, so 10 MB portal uploads pass.
+:80 {
+	handle /api/ingestion/* {
+		reverse_proxy ingestion:3002
+	}
+
+	handle /api/* {
+		reverse_proxy workflow:3001
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
