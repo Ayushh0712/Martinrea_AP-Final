@@ -3,6 +3,8 @@
  * Safe to call in non-browser contexts (returns null / no-op).
  */
 
+import { getJwtExpMs } from './jwt';
+
 function safeGet(): Storage | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -67,6 +69,30 @@ export function setCookie(name: string, value: string, maxAge = COOKIE_MAX_AGE):
   document.cookie = `${name}=${encodeURIComponent(
     value,
   )}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
+}
+
+/**
+ * Store the auth JWT in the cookie with a lifetime that TRACKS THE TOKEN.
+ *
+ * Previously the cookie lived 7 days regardless of the token inside it, so a
+ * Keycloak access token (30 min) would die long before the cookie did -- the
+ * app kept treating the user as "logged in" while carrying a dead token, and
+ * the next protected call failed with `"exp" claim timestamp check failed`.
+ *
+ * Now the cookie's Max-Age is derived from the JWT's `exp` claim, so when the
+ * token expires the cookie disappears too and the route guard cleanly bounces
+ * the user to /login. Falls back to COOKIE_MAX_AGE when the token has no
+ * readable `exp` (unusual, but keeps us from accidentally locking a user out).
+ */
+export function setAuthCookie(token: string): void {
+  const expMs = getJwtExpMs(token);
+  const secondsUntilExp =
+    expMs != null ? Math.floor((expMs - Date.now()) / 1000) : null;
+  const maxAge =
+    secondsUntilExp != null && secondsUntilExp > 0
+      ? secondsUntilExp
+      : COOKIE_MAX_AGE;
+  setCookie(AUTH_COOKIE, token, maxAge);
 }
 
 export function getCookie(name: string): string | null {

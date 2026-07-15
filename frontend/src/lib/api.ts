@@ -39,6 +39,23 @@ export function registerUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler;
 }
 
+/**
+ * Central "session is no longer valid" handler: clear the persisted token +
+ * user and let the registered handler (AuthContext) redirect to /login.
+ *
+ * Exported so non-axios callers can trigger the exact same flow. The multipart
+ * upload in `object-storage.ts` uses a raw `fetch` (to stream FormData through
+ * the Next rewrite to the ingestion service) and therefore never hits the
+ * interceptor below — without this it would surface the raw backend error
+ * ("Invalid token: \"exp\" claim timestamp check failed") instead of bouncing
+ * the user to log in again.
+ */
+export function notifyUnauthorized() {
+  deleteCookie(AUTH_COOKIE);
+  remove(STORAGE_KEYS.authUser);
+  onUnauthorized?.();
+}
+
 api.interceptors.response.use(
   (r) => {
     // Unwrap the PRD response envelope `{ success, data, pagination }` so every
@@ -59,9 +76,7 @@ api.interceptors.response.use(
   },
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      deleteCookie(AUTH_COOKIE);
-      remove(STORAGE_KEYS.authUser);
-      onUnauthorized?.();
+      notifyUnauthorized();
     }
     return Promise.reject(error);
   },

@@ -8,6 +8,7 @@
  * ensures the file lands under the prefix the poller scans.
  */
 import { AUTH_COOKIE, getCookie } from './storage';
+import { notifyUnauthorized } from './api';
 
 /** Accepted invoice document types (PRD ING-01: PDF, JPG, PNG, TIF). */
 export const ACCEPTED_UPLOAD_EXTENSIONS = [
@@ -62,6 +63,13 @@ export async function uploadInvoiceFile(file: File): Promise<void> {
     throw new Error('Network error — could not reach the ingestion service.');
   }
   if (!res.ok) {
+    // The bearer token expired / is invalid. Mirror the axios interceptor:
+    // clear the session and bounce to /login rather than surfacing the raw
+    // backend error (e.g. 'Invalid token: "exp" claim timestamp check failed').
+    if (res.status === 401) {
+      notifyUnauthorized();
+      throw new Error('Your session has expired. Please log in again.');
+    }
     const detail = await res.text().catch(() => '');
     throw new Error(detail.trim() || `Upload failed (HTTP ${res.status}).`);
   }

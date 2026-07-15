@@ -16,7 +16,7 @@ import {
   getCookie,
   readJSON,
   remove,
-  setCookie,
+  setAuthCookie,
   writeJSON,
 } from '@/lib/storage';
 import { authApi, registerUnauthorizedHandler } from '@/lib/api';
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await authApi.login(email, password);
       setToken(res.accessToken);
       setUser(res.user);
-      setCookie(AUTH_COOKIE, res.accessToken);
+      setAuthCookie(res.accessToken);
       writeJSON(STORAGE_KEYS.authUser, res.user);
       return res.user;
     },
