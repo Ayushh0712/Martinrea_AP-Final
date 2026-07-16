@@ -15,7 +15,7 @@ import { createReadStream, ReadStream } from 'fs';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { fn, col, Op, WhereOptions } from 'sequelize';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { DocumentType } from '../../common/enums/document-type.enum';
 import { InvoiceStatus } from '../../common/enums/invoice-status.enum';
 import { AuditLog } from '../../audit-logs/entities/audit-log.entity';
@@ -129,7 +129,7 @@ export class InvoicesService implements OnModuleInit {
     }
 
     const ext = path.extname(file.originalname).toLowerCase();
-    const storedName = `${Date.now()}-${uuidv4()}${ext}`;
+    const storedName = `${Date.now()}-${randomUUID()}${ext}`;
     const rawDir = this.files.getSubfolderPath(UPLOAD_SUBFOLDERS.RAW);
     const rawPath = path.join(rawDir, storedName);
 
@@ -201,7 +201,7 @@ export class InvoicesService implements OnModuleInit {
     this.validateFile(file);
 
     const ext = path.extname(file.originalname).toLowerCase();
-    const stagingId = `staging-${Date.now()}-${uuidv4()}${ext}`;
+    const stagingId = `staging-${Date.now()}-${randomUUID()}${ext}`;
     const stagingDir = this.files.getSubfolderPath(UPLOAD_SUBFOLDERS.STAGING);
     await fs.mkdir(stagingDir, { recursive: true });
     await fs.writeFile(path.join(stagingDir, stagingId), file.buffer);
@@ -631,7 +631,7 @@ export class InvoicesService implements OnModuleInit {
   private async rejectUploadedFile(file: Express.Multer.File, reason: string): Promise<void> {
     try {
       const ext = path.extname(file.originalname).toLowerCase() || '.bin';
-      const rejectedName = `${Date.now()}-${uuidv4()}${ext}`;
+      const rejectedName = `${Date.now()}-${randomUUID()}${ext}`;
       const rejectedDir = this.files.getSubfolderPath(UPLOAD_SUBFOLDERS.REJECTED);
       await fs.mkdir(rejectedDir, { recursive: true });
       const rejectedPath = path.join(rejectedDir, rejectedName);

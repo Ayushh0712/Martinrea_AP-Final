@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import type { ParsedInvoice } from '../ocr/parser/parsed-invoice.interface';
 
 /**
@@ -46,7 +46,7 @@ export class ExtractionStoreService {
   add(entry: NewExtraction): StoredExtraction {
     const stored: StoredExtraction = {
       ...entry,
-      id: uuidv4(),
+      id: randomUUID(),
       extractedAt: new Date().toISOString(),
     };
     this.byId.set(stored.id, stored);
