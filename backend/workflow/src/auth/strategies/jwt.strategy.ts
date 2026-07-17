@@ -100,6 +100,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: unknown): Promise<AuthenticatedUser> {
+    console.log("JWT VALIDATE CALLED");
+    console.log(payload);
     return this.provider === 'keycloak'
       ? this.validateKeycloak(payload as KeycloakAccessTokenPayload)
       : this.validateLocal(payload as JwtPayload);
