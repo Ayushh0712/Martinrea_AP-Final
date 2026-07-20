@@ -11,7 +11,9 @@ import type { AuthUser, LoginResponse } from '@/types/user';
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
-  'https://bloating-plausibly-ardently.ngrok-free.dev/api';
+  // Default to same-origin: the browser calls /api and the reverse proxy
+  // (Caddy in the VM stack) routes it to the workflow/ingestion services.
+  '/api';
 
 export const api = axios.create({
   baseURL: BASE_URL,

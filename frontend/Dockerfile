@@ -14,6 +14,12 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
+
+# Same-origin API base, inlined at build time. The browser calls /api and the
+# reverse proxy (Caddy in the VM stack) routes it to the workflow/ingestion
+# services. Overridable via the docker-compose build arg of the same name.
+ARG NEXT_PUBLIC_API_BASE_URL=/api
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 RUN npm run build
 
 EXPOSE 3000
