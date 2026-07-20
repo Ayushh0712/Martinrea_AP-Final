@@ -99,7 +99,12 @@ export class AuthService {
       );
     }
 
-    const tokenUrl = `${issuer.replace(/\/+$/, '')}/protocol/openid-connect/token`;
+    // Prefer an explicit, container-reachable token endpoint when configured
+    // (KEYCLOAK_TOKEN_URL); otherwise derive it from the issuer. This lets the
+    // reachable address differ from the issuer string used for verification.
+    const tokenUrl =
+      this.config.get<string>('keycloak.tokenUrl') ||
+      `${issuer.replace(/\/+$/, '')}/protocol/openid-connect/token`;
     const body = new URLSearchParams({
       grant_type: 'password',
       client_id: clientId,

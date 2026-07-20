@@ -23,6 +23,7 @@ export interface AppConfig {
   keycloak: {
     issuer: string;
     jwksUri: string;
+    tokenUrl: string;
     audience: string;
     clientId: string;
     clientSecret: string;
@@ -72,6 +73,11 @@ export default (): AppConfig => ({
     jwksUri:
       process.env.KEYCLOAK_JWKS_URI ??
       'http://localhost:8080/realms/martinrea/protocol/openid-connect/certs',
+    // Optional override for the Direct Access Grant token endpoint. Lets the
+    // reachable Keycloak address differ from the issuer string (e.g. reach it at
+    // host.docker.internal from a container while the token `iss` stays the
+    // public URL). Empty -> derive from the issuer.
+    tokenUrl: process.env.KEYCLOAK_TOKEN_URL ?? '',
     audience: process.env.KEYCLOAK_AUDIENCE ?? 'martinrea-ap',
     clientId: process.env.KEYCLOAK_CLIENT_ID ?? 'martinrea-ap',
     clientSecret: process.env.KEYCLOAK_CLIENT_SECRET ?? '',

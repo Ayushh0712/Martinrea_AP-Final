@@ -4,25 +4,28 @@ Deploys the full stack to the **netlink-dev** VM behind a single public port.
 
 - **VM**: `netlink-dev` @ `80.225.204.210` (2 CPU / 8 GB / 100 GB, OCI)
 - **Public ports**: `22` (SSH) and `80` (HTTP via Caddy) only
-- **Everything else** (frontend, workflow, ingestion, Postgres, Redis, Keycloak) runs on the internal Docker network and is not reachable from the internet.
+- **In-stack services** (frontend, workflow, ingestion, Redis) run on the internal Docker network and are not reachable from the internet.
+- **Reused host services** (NOT started by this compose): the existing Postgres **appdb** (`:8082`) and the existing **Keycloak** (`:8081`). The containers reach them via `host.docker.internal` (`extra_hosts: host-gateway`).
 
 ```
 Browser -> http://80.225.204.210 (Caddy :80)
     /api/ingestion/*  -> ingestion  :3002
     /api/*            -> workflow    :3001
     everything else   -> frontend    :3000
-workflow -> postgres / redis / keycloak (internal)
-ingestion -> keycloak (internal)
+workflow  -> redis (internal)
+workflow  -> appdb Postgres   (host.docker.internal:8082)
+workflow  -> Keycloak         (host.docker.internal:8081)
+ingestion -> Keycloak         (host.docker.internal:8081)
 ```
 
 All deployment files live under `deploy/prod/`:
 
 | File | Purpose |
 | --- | --- |
-| `docker-compose.prod.yml` | The 7-service stack (caddy, frontend, workflow, ingestion, postgres, redis, keycloak) |
+| `docker-compose.prod.yml` | The in-stack services (caddy, frontend, workflow, ingestion, redis); reuses host appdb + Keycloak |
 | `Caddyfile` | Reverse-proxy routing (the only published port) |
-| `workflow.env` | workflow-service env (internal hostnames, VM IP, secrets) |
-| `ingestion.env` | ingestion env (internal hostnames, VM IP, secrets) |
+| `workflow.env` | workflow-service env (host.docker.internal DB/Keycloak, VM IP, secrets) |
+| `ingestion.env` | ingestion env (host.docker.internal Keycloak, VM IP, secrets) |
 
 > Security note: `workflow.env` and `ingestion.env` contain live secrets (SMTP,
 > IMAP, Keycloak client secret, OCI PAR, DB password). Treat this repo as
@@ -75,7 +78,9 @@ sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
 sudo netfilter-persistent save 2>/dev/null || sudo service iptables save 2>/dev/null || true
 ```
 
-Port 22 is already open (that's how you SSH in). Do **not** open 8080/5432/6379.
+Port 22 is already open (that's how you SSH in). Do **not** open `8081` (Keycloak),
+`8082` (appdb) or `6379` (Redis) to the internet — the containers reach appdb and
+Keycloak over the internal `host.docker.internal` bridge, not the public IP.
 
 ---
 
@@ -125,7 +130,64 @@ The tarball includes them; if empty they'll still be created on extract.
 
 ---
 
-## 5. Build and start
+## 5. Prerequisite: make host appdb + Keycloak reachable from Docker
+
+This stack does NOT run its own Postgres/Keycloak — it reuses the ones already
+on the VM. The containers reach the host via `host.docker.internal` (mapped to
+`host-gateway` in the compose file), so both host services must listen on all
+interfaces and permit the Docker bridge subnet.
+
+1. **Old pm2 stack** — stop the app processes so they don't double-process appdb
+   / the OCI bucket and don't fight over ports:
+   ```bash
+   pm2 stop mreap-frontend mreap-workflow mreap-ingestion
+   ```
+
+2. **appdb (Postgres :8082)** — must listen on `0.0.0.0` and allow the Docker
+   subnet in `pg_hba.conf`:
+   ```
+   # postgresql.conf
+   listen_addresses = '*'
+   # pg_hba.conf (append)
+   host  all  all  172.16.0.0/12  md5
+   ```
+   Reload (`SELECT pg_reload_conf();` or restart), then verify from a throwaway
+   container:
+   ```bash
+   docker run --rm --add-host host.docker.internal:host-gateway postgres:16-alpine \
+     pg_isready -h host.docker.internal -p 8082
+   # -> host.docker.internal:8082 - accepting connections
+   ```
+   Confirm `DB_PASSWORD` in `workflow.env` matches appdb's `martinrea` user.
+
+3. **Keycloak (:8081)** — must listen on `0.0.0.0:8081`. Verify from a container:
+   ```bash
+   docker run --rm --add-host host.docker.internal:host-gateway curlimages/curl \
+     -s -o /dev/null -w "%{http_code}\n" \
+     http://host.docker.internal:8081/realms/martinrea/protocol/openid-connect/certs
+   # -> 200
+   ```
+   The realm must have: the `martinrea-ap` client (Direct Access Grants ON,
+   confidential — its secret must match `KEYCLOAK_CLIENT_SECRET` in
+   `workflow.env`), the **`audience-martinrea-ap` mapper** (ingestion enforces
+   `aud`, so uploads 401 without it), the 4 realm roles, and the users. If the
+   existing realm lacks any of these, import
+   `backend/workflow/keycloak/import/martinrea-realm.json`.
+
+4. **Confirm the token `iss`** — decode an access token and make
+   `KEYCLOAK_ISSUER` (workflow.env) / `KEYCLOAK_ISSUER_URL` (ingestion.env) equal
+   its `iss` claim exactly:
+   ```bash
+   curl -s -X POST http://localhost:8081/realms/martinrea/protocol/openid-connect/token \
+     -d grant_type=password -d client_id=martinrea-ap -d client_secret=<SECRET> \
+     -d username=clerk@martinrea.dev -d password=Password123! -d scope=openid \
+     | sed -E 's/.*"access_token":"([^"]+)".*/\1/' | cut -d. -f2 | base64 -d 2>/dev/null
+   # -> look for "iss":"http://80.225.204.210:8081/realms/martinrea"
+   ```
+
+---
+
+## 6. Build and start
 
 ```bash
 cd ~/mre-ap
@@ -140,15 +202,16 @@ docker compose -f deploy/prod/docker-compose.prod.yml logs -f workflow ingestion
 ```
 
 Wait for `Martinrea AP backend listening ...` (workflow) and
-`Ingestion service listening ...` (ingestion). Keycloak's realm import on first
-boot adds ~30-60s.
+`Ingestion service listening ...` (ingestion).
 
 ---
 
-## 6. Seed the database
+## 7. Seed the database (only if appdb is missing rows)
 
-The fresh Postgres has an empty schema; Sequelize `synchronize` (NODE_ENV=development)
-creates the tables on first workflow boot. Then seed:
+appdb is reused, so it normally already holds users, rules and data — skip this.
+Sequelize `synchronize` (NODE_ENV=development) adds any missing tables on first
+workflow boot. If a Keycloak user has no matching local mirror row (login fails
+with "no local user mirror"), seed:
 
 ```bash
 # Minimum: users + approval rules (enough to log in and run the workflow)
@@ -161,7 +224,7 @@ docker compose -f deploy/prod/docker-compose.prod.yml exec workflow npm run seed
 
 ---
 
-## 7. Smoke test (over port 80)
+## 8. Smoke test (over port 80)
 
 ```bash
 # 1. Login (Keycloak Direct Access Grant via the workflow service)
@@ -178,11 +241,17 @@ curl -s http://80.225.204.210/api/invoices -H "Authorization: Bearer <TOKEN>"
 curl -s -o /dev/null -w "%{http_code}\n" http://80.225.204.210/
 # -> expect 200
 
-# 4. Ingestion poller ticking
+# 4. Invoice upload through the ingestion proxy (the path that was failing)
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://80.225.204.210/api/ingestion/upload \
+  -H "Authorization: Bearer <TOKEN>" -F "file=@/path/to/invoice.pdf"
+# -> expect 201 (a 401 means the aud/iss/role check failed; a connection error
+#    means Caddy or ingestion isn't up)
+
+# 5. Ingestion poller ticking
 docker compose -f deploy/prod/docker-compose.prod.yml logs --tail=20 ingestion
 # -> expect "[dummymreai@gmail.com] N unread message(s)" every 30s
 
-# 5. PO drop folder: copy a PDF into ~/mre-ap/PO-PDFs on the VM, then
+# 6. PO drop folder: copy a PDF into ~/mre-ap/PO-PDFs on the VM, then
 docker compose -f deploy/prod/docker-compose.prod.yml logs --tail=20 workflow
 # -> expect the PO PDF sync to upload it to OCI
 ```
@@ -197,9 +266,8 @@ users (password `Password123!`): `clerk@`, `pm@`, `fd@martinrea.dev`.
 - **Restart a service**: `docker compose -f deploy/prod/docker-compose.prod.yml restart workflow`
 - **Full restart**: `... down` then `... up -d` (keeps volumes/data). Add `-v` only to wipe data.
 - **Update code**: re-transfer, then `... up -d --build`.
-- **Keycloak admin console** (not public): from the dev machine
-  `ssh -L 8080:localhost:8080 netlink-dev@80.225.204.210`, then browse
-  `http://localhost:8080` (admin / the KEYCLOAK_ADMIN_PASSWORD in the compose file).
+- **Keycloak** is the existing host instance on `:8081` (managed outside this
+  stack); use its own admin console. This compose no longer runs Keycloak.
 - **OCI PAR refresh**: PARs expire. If OCR/ingest stops fetching, generate a new
   PAR in the OCI console and update `OCI_PAR_URL` (workflow.env) +
   `BLOB_PAR_BASE_URL` (ingestion.env), then `... up -d` to recreate the services.
@@ -212,5 +280,11 @@ users (password `Password123!`): `clerk@`, `pm@`, `fd@martinrea.dev`.
 - **Gmail** may challenge the first IMAP/SMTP login from the new VM IP. If email
   ingestion or notifications fail, approve the sign-in / regenerate the app
   password for `dummymreai@gmail.com` (IMAP) and `mramankhann@gmail.com` (SMTP).
-- **DB password** in `workflow.env` (`DB_PASSWORD`) must always match
-  `POSTGRES_PASSWORD` in `docker-compose.prod.yml`.
+- **appdb + Keycloak are reused from the host**, not started by this compose.
+  The containers reach them at `host.docker.internal:8082` / `:8081`; keep those
+  host services bound to `0.0.0.0` and allow the Docker bridge subnet (see
+  section 5). `DB_PASSWORD` must match appdb's `martinrea` user, and
+  `KEYCLOAK_CLIENT_SECRET` must match the existing `martinrea-ap` client.
+- **Keycloak split addressing**: `KEYCLOAK_ISSUER` is the token `iss` (verify by
+  decoding a token); `KEYCLOAK_JWKS_URI` and `KEYCLOAK_TOKEN_URL` use
+  `host.docker.internal:8081` so a container never has to hairpin to the public IP.
